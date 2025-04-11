@@ -46,4 +46,4 @@ This Project was done under the guidance of Praveen Kumar Venkatachala.
 
 - PSRR
 
-![Screenshot 2025-04-11 180604](https://github.com/user-attachments/assets/386a9229-33d6-4f9b-88e1-25af7699f7a9)
+![Screenshot 2025-04-11 180604](https://github.com/user-attachments/assets/28aa9bea-8f71-4ae2-b5c1-8851d846f7d2)
