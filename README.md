@@ -43,3 +43,7 @@ This Project was done under the guidance of Praveen Kumar Venkatachala.
 - Gain Plot
   
 ![Screenshot 2025-04-11 180835](https://github.com/user-attachments/assets/7bff8704-ffa7-4256-8acc-5c6ac2d46012)
+
+- PSRR
+
+![Screenshot 2025-04-11 180604](https://github.com/user-attachments/assets/386a9229-33d6-4f9b-88e1-25af7699f7a9)
