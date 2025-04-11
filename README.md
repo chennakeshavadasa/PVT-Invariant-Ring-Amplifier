@@ -11,6 +11,9 @@ This Project was done under the guidance of Praveen Kumar Venkatachala.
 - Single Ended Ring Amplifier
 ![WhatsApp Image 2025-04-09 at 17 53 18_316a4efe](https://github.com/user-attachments/assets/84b98bef-1db1-4f0b-96a1-14612791bf6d)
 
+- Fully Differential Ring Amplifier
+![WhatsApp Image 2025-04-11 at 19 31 58_dd09a88e](https://github.com/user-attachments/assets/b7e4e0dc-f0f5-4341-9d82-9ad56e390749)
+
 - Ring Ampllifier Stage 1
 
 ![WhatsApp Image 2025-04-11 at 18 02 13_e2c785c3](https://github.com/user-attachments/assets/e378c143-f2e7-44ac-bc56-3d9abdccdb36)
