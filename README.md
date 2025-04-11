@@ -33,6 +33,10 @@ This Project was done under the guidance of Praveen Kumar Venkatachala.
 # AC Analysis
 - Note: This is in no way a representation of the stability of a Ring Amplifier. A Ring Amplifier can still exhibit ringing even with a good phase margin. The best way to verify the stability and proper operation of a Ring Amplifier is through a transient step response, since AC or STB analysis involves linearizing the system around a single operating point. In contrast, a Ring Amplifier is a dynamic amplifier with three distinct settling phases—RC settling, large-signal settling, and small-signal settling—and involves both linear and non-linear settling behavior during its operation.
 
+- Testbench
+
+  ![WhatsApp Image 2025-04-11 at 19 33 09_6ade0e5b](https://github.com/user-attachments/assets/f74a0e1c-7ce8-4072-916a-32393c1afd98)
+
 - Bandwidth and Phase Margin <br>
 
 <p align="center">
