@@ -22,3 +22,11 @@ This Project was done under the guidance of Praveen Kumar Venkatachala.
 
 - Ring Amplifier Stage 2 Replica bias
 ![WhatsApp Image 2025-04-11 at 18 02 13_0e1230e5](https://github.com/user-attachments/assets/52edf9c3-88fd-4922-a526-0867b114fe70)
+
+# AC Analysis
+- Note: This is no way representation of stability of Ring Amplifier. Ring Amplifier can still show Ringing with good Phase Margin. The best way to varify the working of Ring Amplifier is with a transient step.
+
+![Screenshot 2025-04-11 180823](https://github.com/user-attachments/assets/4a35142d-63c0-4d9d-9e3b-2ea8917c1953)
+
+![Screenshot 2025-04-11 180823](https://github.com/user-attachments/assets/dc5dd779-621d-4228-af5d-839a0d8aea46)
+ 
