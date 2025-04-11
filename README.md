@@ -33,7 +33,7 @@ This Project was done under the guidance of Praveen Kumar Venkatachala.
 - Bandwidth and Phase Margin <br>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/a7d6d667-cf87-42bb-aade-9051b9ec2558" alt="Screenshot" />
+  <img src="https://github.com/user-attachments/assets/b72bcfb2-99b3-417a-8aae-e31b2d1fee59" alt="Screenshot" />
 </p>
 
 - Gain and Phase Plot
