@@ -1,0 +1,27 @@
+v {xschem version=3.4.6 file_version=1.2}
+G {}
+K {type=subcircuit
+format="@name @pinlist @symname"
+template="name=x1"
+}
+V {}
+S {}
+E {}
+L 4 680 -65 700 -65 {}
+L 4 500 5 520 5 {}
+L 4 680 60 700 60 {}
+L 7 600 -110 600 -90 {}
+L 7 600 85 600 105 {}
+B 5 597.5 -112.5 602.5 -107.5 {name=VDD dir=inout}
+B 5 697.5 -67.5 702.5 -62.5 {name=VCTRLP dir=out}
+B 5 497.5 2.5 502.5 7.5 {name=Vin_STG2 dir=in}
+B 5 697.5 57.5 702.5 62.5 {name=VCTRLN dir=out}
+B 5 597.5 102.5 602.5 107.5 {name=GND dir=inout}
+P 4 6 600 -90 680 -90 680 85 520 85 520 -90 600 -90 {}
+T {@symname} 548 -11 0 0 0.3 0.3 {}
+T {@name} 685 -82 0 0 0.2 0.2 {}
+T {VDD} 615 -84 0 1 0.2 0.2 {}
+T {VCTRLP} 675 -69 0 1 0.2 0.2 {}
+T {Vin_STG2} 465 -9 0 0 0.2 0.2 {}
+T {VCTRLN} 675 56 0 1 0.2 0.2 {}
+T {GND} 585 79 2 1 0.2 0.2 {}
