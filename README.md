@@ -1,6 +1,9 @@
 # PVT-Invariant-Ring-Amplifier
 Design of Process Invariant Biasing of Ring Amplifiers Using Deadzone Regulation Circuit
 
+# Acknowledgement 
+This Project was done under the guidance of Praveen Kumar Venkatachala.
+
 # Specification
 - Bandwidth: 20MHz(Tsettle<250nsec)
 
