@@ -137,3 +137,4 @@ model=sg13_hv_pmos
 spiceprefix=X
 }
 C {iopin.sym} 2355 -305 0 0 {name=p9 lab=VoutN}
+C {title.sym} 830 -30 0 0 {name=l7 author="Nithin Purushothama"}

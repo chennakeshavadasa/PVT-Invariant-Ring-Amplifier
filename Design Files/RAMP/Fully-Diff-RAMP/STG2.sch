@@ -99,3 +99,9 @@ C {ipin.sym} 660 -240 0 0 {name=p4 lab=VCTRL_N}
 C {opin.sym} 585 -320 0 0 {name=p9 lab=VDZN}
 C {opin.sym} 1040 -450 0 0 {name=p6 lab=VDZP}
 C {title.sym} 160 -30 0 0 {name=l1 author="Nithin Purushothama"}
+C {sg13g2_pr/annotate_fet_params.sym} -30 -650 0 0 {name=annot1 ref=MP_DZ_STG2_3N}
+C {sg13g2_pr/annotate_fet_params.sym} 60 -480 0 0 {name=annot2 ref=MN_STG2_3P1}
+C {sg13g2_pr/annotate_fet_params.sym} 60 -280 0 0 {name=annot3 ref=MN_STG2_3N1}
+C {sg13g2_pr/annotate_fet_params.sym} 1020 -620 0 0 {name=annot4 ref=MP_STG2_3P1}
+C {sg13g2_pr/annotate_fet_params.sym} 1010 -400 0 0 {name=annot5 ref=MP_STG2_3P2}
+C {sg13g2_pr/annotate_fet_params.sym} 1000 -260 0 0 {name=annot6 ref=MN_DZ_STG2_3P}

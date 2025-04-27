@@ -91,7 +91,7 @@ C {iopin.sym} 135 -140 0 1 {name=p2 lab=GND}
 C {opin.sym} 735 -520 0 0 {name=p3 lab=Vop_1}
 C {ipin.sym} 225 -350 0 0 {name=p4 lab=Vip}
 C {ipin.sym} 715 -350 0 1 {name=p5 lab=Vin}
-C {/foss/designs/fd_pr/sg13_hv_pmos.sym} 365 -650 0 1 {name=MP_STG1_CL_P1
+C {sg13g2_pr/sg13_hv_pmos.sym} 365 -650 0 1 {name=MP_STG1_CL_P1
 l=1u
 w=0.5u
 ng=1
@@ -99,7 +99,7 @@ m=1
 model=sg13_hv_pmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_hv_pmos.sym} 585 -650 0 0 {name=MP_STG1_CL_P2
+C {sg13g2_pr/sg13_hv_pmos.sym} 585 -650 0 0 {name=MP_STG1_CL_P2
 l=1u
 w=0.5u
 ng=1
