@@ -5,13 +5,10 @@ V {}
 S {}
 E {}
 T {Targeted BW=20MHz} 0 -640 0 0 0.4 0.4 {}
-N 380 -310 460 -310 {lab=#net1}
-N 380 -250 460 -250 {lab=VICM}
 N 380 -150 380 -130 {lab=GND}
-N 380 -250 380 -210 {lab=VICM}
 N 880 -350 880 -325 {lab=GND}
 N 880 -430 880 -410 {lab=VDD}
-N 560 -420 560 -390 {lab=VDD}
+N 540 -370 540 -340 {lab=VDD}
 N 740 -170 740 -150 {lab=GND}
 N 540 -510 580 -510 {
 lab=probe}
@@ -21,21 +18,23 @@ N 540 -580 540 -510 {
 lab=probe}
 N 500 -510 540 -510 {
 lab=probe}
-N 740 -320 740 -230 {lab=#net2}
-N 640 -510 740 -510 {lab=#net2}
+N 740 -280 740 -230 {lab=Vout}
+N 640 -510 740 -510 {lab=Vout}
 N 380 -510 440 -510 {lab=#net1}
-N 380 -510 380 -310 {lab=#net1}
-N 680 -320 740 -320 {lab=#net2}
-N 740 -510 740 -320 {lab=#net2}
-N 680 -180 680 -160 {lab=GND}
-N 560 -170 560 -140 {lab=GND}
+N 380 -510 380 -300 {lab=#net1}
+N 740 -510 740 -280 {lab=Vout}
+N 540 -220 540 -190 {lab=GND}
+N 380 -300 470 -300 {lab=#net1}
+N 380 -260 470 -260 {lab=VICM}
+N 380 -260 380 -210 {lab=VICM}
+N 650 -280 740 -280 {lab=Vout}
 C {vsource.sym} 380 -180 0 0 {name=V1 value=0.825 savecurrent=false}
 C {vsource.sym} 880 -380 0 0 {name=V2 value=1.65 savecurrent=false}
 C {vdd.sym} 880 -430 0 0 {name=l1 lab=VDD}
 C {gnd.sym} 880 -325 0 0 {name=l2 lab=GND}
 C {gnd.sym} 380 -130 0 0 {name=l3 lab=GND}
-C {vdd.sym} 560 -420 0 0 {name=l4 lab=VDD}
-C {gnd.sym} 560 -140 0 0 {name=l5 lab=GND}
+C {vdd.sym} 540 -370 0 0 {name=l4 lab=VDD}
+C {gnd.sym} 540 -190 0 0 {name=l5 lab=GND}
 C {capa.sym} 740 -200 0 0 {name=C1
 m=1
 value=50p
@@ -57,7 +56,7 @@ value="
 
  set run =$&run
  ac dec 20 0.01 10G
- write RamP_tb1_CP_FB_\{$run\}.raw
+ write RamP_tb1_CP_FB_1_\{$run\}.raw
 
  all
  alter @Vprobe1[acmag]=0
@@ -112,10 +111,5 @@ C {lab_pin.sym} 540 -510 3 0 {name=p1 sig_type=std_logic lab=probe}
 C {gnd.sym} 540 -670 2 0 {name=l8 lab=GND}
 C {lab_pin.sym} 380 -250 0 0 {name=p2 sig_type=std_logic lab=VICM}
 C {ngspice_probe.sym} 740 -280 0 0 {name=r2}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/RAMP-FD.sym} 200 -280 2 1 {name=x2}
-C {capa.sym} 680 -210 0 0 {name=C2
-m=1
-value=50p
-footprint=1206
-device="ceramic capacitor"}
-C {gnd.sym} 680 -160 0 0 {name=l9 lab=GND}
+C {/foss/designs/RAMP/Fully-Diff-RAMP/RAMP2.sym} 210 -280 0 0 {name=x1}
+C {lab_pin.sym} 740 -280 0 1 {name=p3 sig_type=std_logic lab=Vout}

@@ -28,7 +28,7 @@ N 740 -510 740 -280 {lab=#net2}
 N 640 -510 740 -510 {lab=#net2}
 N 380 -510 440 -510 {lab=#net1}
 N 380 -510 380 -310 {lab=#net1}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/RAMP.sym} 280 -280 2 1 {name=x1}
+C {/foss/designs/RAMP/Fully-Diff-RAMP/RAMP.sym} 280 -280 2 1 {name=x1 }
 C {vsource.sym} 380 -180 0 0 {name=V1 value=0.825 savecurrent=false}
 C {vsource.sym} 880 -380 0 0 {name=V2 value=1.65 savecurrent=false}
 C {vdd.sym} 880 -430 0 0 {name=l1 lab=VDD}
@@ -56,7 +56,7 @@ value="
  dowhile run < runs
 
  set run =$&run
- ac dec 20 1 10G
+ ac dec 20 0.01 10G
  write RamP_tb1_CP_FB_\{$run\}.raw
 
  all
