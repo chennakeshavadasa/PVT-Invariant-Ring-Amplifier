@@ -1,56 +1,199 @@
 # PVT-Invariant-Ring-Amplifier
-Design of Process Invariant Biasing of Ring Amplifiers Using Deadzone Regulation Circuit
 
-# Acknowledgement 
-This Project was done under the guidance of Praveen Kumar Venkatachala.
+**Design of Process Invariant Biasing of Ring Amplifiers Using Deadzone Regulation Circuit**
 
-# Specification
-- Bandwidth: 20MHz(Tsettle<250nsec)
+Implemented in xschem on the open-source **IHP SG13G2** (130nm SiGe BiCMOS) PDK.
 
-# Schematics
-- Single Ended Ring Amplifier
-![WhatsApp Image 2025-04-09 at 17 53 18_316a4efe](https://github.com/user-attachments/assets/84b98bef-1db1-4f0b-96a1-14612791bf6d)
+## Acknowledgement
 
-- Fully Differential Ring Amplifier
-![WhatsApp Image 2025-04-11 at 19 31 58_dd09a88e](https://github.com/user-attachments/assets/b7e4e0dc-f0f5-4341-9d82-9ad56e390749)
+This project was done under the guidance of **Praveen Kumar Venkatachala**, and is a direct schematic-level implementation of Chapter 3 of his PhD dissertation:
 
-- Ring Ampllifier Stage 1
+> P. K. Venkatachala, *"Design Considerations and Circuit Techniques for Robust ringamps,"* PhD Dissertation, Oregon State University, Aug. 2019 (advisor: Prof. Un-Ku Moon) — included in this repo at [`Thesis/VenkatachalaPraveenkumar2019.pdf`](Thesis/VenkatachalaPraveenkumar2019.pdf).
 
-![WhatsApp Image 2025-04-11 at 18 02 13_e2c785c3](https://github.com/user-attachments/assets/e378c143-f2e7-44ac-bc56-3d9abdccdb36)
+The specific technique implemented here was originally published as:
 
-- Ring Amplifier Stage 1 Common Mode
-  
-![WhatsApp Image 2025-04-11 at 18 02 12_88d66362](https://github.com/user-attachments/assets/17124f87-9e75-4f78-9699-5873ea0e60f8)
+> P. Venkatachala, S. Leuenberger, A. ElShater, C. Lee, Y. Xu, B. Xiao, M. Oatman, U. Moon, *"Process Invariant Biasing of Ring Amplifiers Using Deadzone Regulation Circuit,"* IEEE ISCAS 2018.
 
-- Ring Amplifier Stage 2
-  
-![WhatsApp Image 2025-04-11 at 18 02 13_87e2aa85](https://github.com/user-attachments/assets/e9da228a-866c-4ded-aff1-390cc53c6cd0)
+## Specification
 
-- Ring Amplifier Stage 2 Replica bias
-  
-![WhatsApp Image 2025-04-11 at 18 02 13_0e1230e5](https://github.com/user-attachments/assets/52edf9c3-88fd-4922-a526-0867b114fe70)
+- Bandwidth: 20 MHz (T_settle < 250 ns)
 
-# AC Analysis
-- Note: This is in no way a representation of the stability of a Ring Amplifier. A Ring Amplifier can still exhibit ringing even with a good phase margin. The best way to verify the stability and proper operation of a Ring Amplifier is through a transient step response, since AC or STB analysis involves linearizing the system around a single operating point. In contrast, a Ring Amplifier is a dynamic amplifier with three distinct settling phases—RC settling, large-signal settling, and small-signal settling—and involves both linear and non-linear settling behavior during its operation.
+---
+
+## 1. Background — why ring amplifiers need this
+
+A ring amplifier (ringamp) is a 3-stage, inverter-chain amplifier that looks topologically like a ring oscillator, but a **deadzone voltage** inserted between stage 2 and stage 3 breaks the oscillation condition and turns the loop into a self-regulating class-AB amplifier:
+
+- During a large input step, the deadzone is exceeded and the output-stage inverters slew at near full current, like an open-loop inverter — this gives ringamps their power-efficient, high-slew-rate behavior.
+- As the error signal collapses, the drive re-enters the deadzone window and the output stage settles into a very low quiescent current **I_Q**, creating the dominant pole that stabilizes the negative-feedback loop.
+- Because high current only flows while slewing, average power is far below a comparably fast OTA — this is the whole value proposition of ringamps in SC pipeline/SAR ADCs and fast-transient LDOs.
+
+This repo implements the **current-starved-inverter** variant of the deadzone (rather than a resistor or explicit voltage source), where `V_CTRLP`/`V_CTRLN` throttle the current available to the stage2→stage3 node.
+
+### Small-signal design equations (from the thesis, Ch. 2)
+
+```
+Closed-loop step response (dominant-pole approx.):
+  A_CL(s) = -G · L(0)/(1+L(0)) · (1 - s/z)/(1 + s/p)         (2.23)
+  L(0) = β·A(0),   A(0) = A1·A2·A3                            (2.24)
+  β = C_S / (C_S + C_in1 + C_F)                                (2.25)
+
+Loop gain-bandwidth product:
+  GBW = β · (A1·A2·gm3) / C_out                                (2.26)
+  C_out = C_L + (1-β)·C_F                                      (2.27)
+
+RHP zero (close to GBW — cannot be ignored for phase margin):
+  z = gm3 / c_gd3                                              (2.28)
+
+Noise condition (stage 1 gm must dominate stage 2/3 noise contributions):
+  gm1 >= A1 · A2 · gm3                                         (2.55)
+
+Settling accuracy vs. time constant (τ = 1/GBW):
+  log2(ε_dynamic) = -t/τ · log2(e)                             (2.18)
+  → each τ buys ~1.44 bits of settling accuracy
+```
+
+---
+
+## 2. The problem: deadzone bias tracks V_TH, not PVT
+
+The deadzone bias voltages set the output stage's quiescent current I_Q — and hence gm3 and GBW — relative to the **threshold voltage** of the stage-3 devices. Since V_TH shifts with process corner, a bias tuned for TT silicon is wrong everywhere else.
+
+Thesis design example (65nm, 1.2V, closed-loop gain = 4, F_S = 125 MHz, target ≤0.05% settling):
+
+| Process Corner | GBW (fixed TT-tuned bias) | Phase Margin |
+|---|---|---|
+| SS | 9 MHz | 85° |
+| TT | 415 MHz | 68° |
+| FF | 1500 MHz | 53° |
+
+At SS the loop is >40x slower than TT, and settling accuracy blows out to **0.7%** against the 0.05% target — this single result is the entire motivation for the regulation circuit below.
+
+---
+
+## 3. The fix: Deadzone Regulation Circuit
+
+A replica-biasing negative-feedback loop regulates I_Q to a fixed value across corners:
+
+1. A constant current source **I_BIAS** through diode-connected replicas of the output-stage devices generates reference gate voltages **VGP_REF**/**VGN_REF** — these track V_TH shifts automatically for a fixed bias current.
+2. A **DC-only replica of stage 2** (`STG2_Replica`) carries no signal, only bias current.
+3. **Error amplifiers** compare the replica's steady-state output against VGP_REF/VGN_REF and servo `V_CTRLP`/`V_CTRLN` until they match.
+4. Those corrected control voltages bias the **real** stage-3 inverter in the signal path — since this loop sits outside the signal path, the error amps' own bandwidth requirement is relaxed (~30dB gain is enough).
+
+Result — same 65nm/125MHz example, deadzone now generated by the regulation loop:
+
+| Process Corner | GBW (regulated) | Phase Margin | Settling accuracy |
+|---|---|---|---|
+| SS | 475 MHz | 61° | 0.025–0.04% |
+| TT | 415 MHz | 68° | 0.03% |
+| FF | 380 MHz | 72° | 0.04–0.05% |
+
+GBW spread compresses from >150:1 down to roughly ±15%, and all three corners now meet the 0.05% target. The small residual spread comes from A1·A2 (stage 1/2 DC gain), which the regulation loop doesn't directly control — see Eq. 2.26.
+
+### Per-stage biasing tradeoffs this forces (thesis §3.5)
+
+| Stage | Biasing choice | Held constant | Trade-off |
+|---|---|---|---|
+| Stage 3 (output) | constant-g_m (via regulation loop) | GBW | Intrinsic gain / DC gain varies → close DC-gain spec at worst-case corner |
+| Stage 1, 2 | constant-I_D | Current density / intrinsic gain | g_m varies → close noise spec (Eq. 2.55) at worst-case corner |
+| Stage 1, 2 | (consequence) | — | f_T varies → close phase-margin spec at worst-case corner |
+
+This is the classical constant-g_m vs. constant-I_D biasing dichotomy from OTA design, applied per-stage to a 3-stage inverter-based amplifier instead of a single differential pair.
+
+> **Note on transient vs. AC verification:** AC/STB phase margin alone is *not* sufficient evidence of stable settling for a ring amplifier — a ringamp can still ring in the transient step response even with a healthy phase margin from linearized AC analysis, since a ringamp has three distinct settling phases (RC settling, large-signal settling, small-signal settling) involving both linear and non-linear behavior. The transient step response is the definitive test; see Chapter 4 of the thesis for a passive-compensation technique (using SC feedback-switch resistances to inject LHP zeros, analogous to derivative control in a PID controller) that addresses this large-signal ringing independent of the topology used here.
+
+---
+
+## 4. Schematics
+
+All schematics are drawn in **xschem**, targeting the **IHP SG13G2** open PDK (`sg13_lv/hv_pmos`, `sg13_lv/hv_nmos` device flavors).
+
+### Top level
+
+![Fully Differential Ring Amplifier](Design%20Files/RAMP/Fully-Diff-RAMP/RAMP-FD.png)
+
+Signal path: `STG2 → STG1-FD (with STG1-CM) → STG2_Replica → STG2`. `STG2_Replica` sits alongside the signal path purely for bias generation (Section 3 above).
+
+### Stage 1 — input differential pair
+
+![Stage 1](Design%20Files/RAMP/Fully-Diff-RAMP/STG1.png)
+
+### Stage 1 — common-mode feedback
+
+![Stage 1 CM](Design%20Files/RAMP/Fully-Diff-RAMP/STG1-CM.png)
+
+### Stage 2 — current-starved deadzone stage
+
+![Stage 2](Design%20Files/RAMP/Fully-Diff-RAMP/STG2.png)
+
+### Stage 2 Replica — bias-only regulation loop anchor
+
+![Stage 2 Replica](Design%20Files/RAMP/Fully-Diff-RAMP/STG2_Replica.png)
+
+### Deadzone regulation loop — standalone testbench
+
+![Deadzone Tracking](Design%20Files/RAMP/STG2/DZD_Trk_STG2_try1.png)
+
+Uses dedicated `POTA`/`NOTA` OTA blocks as the error amplifiers, with a `.control` block sweeping `dc temp -50 150 1` and `ac dec 20 1 1e8` — validating the regulation loop across temperature as well as process corner.
+
+### Closed-loop testbench — loop-gain extraction
+
+![Closed Loop Testbench](Design%20Files/RAMP/RAMP-Test/RamP_tb1_CP_FB.png)
+
+Uses a dual-probe (series voltage + shunt current injection) loop-gain measurement — the classical **Middlebrook technique** — combining both injections as `1/mb = 1/(vprb1+ip22) - 1` so the extracted loop gain (and hence GBW/phase margin) is insensitive to where exactly the break point sits relative to source/load impedance, which is the technically correct way to measure loop gain in a differential feedback loop.
+
+---
+
+## 5. AC Analysis
+
+> **Note:** This is in no way a representation of the stability of a Ring Amplifier. A Ring Amplifier can still exhibit ringing even with a good phase margin. The best way to verify the stability and proper operation of a Ring Amplifier is through a transient step response, since AC or STB analysis involves linearizing the system around a single operating point. In contrast, a Ring Amplifier is a dynamic amplifier with three distinct settling phases — RC settling, large-signal settling, and small-signal settling — and involves both linear and non-linear settling behavior during its operation.
 
 - Testbench
 
-  ![WhatsApp Image 2025-04-11 at 19 33 09_6ade0e5b](https://github.com/user-attachments/assets/f74a0e1c-7ce8-4072-916a-32393c1afd98)
+  ![Testbench](https://github.com/user-attachments/assets/f74a0e1c-7ce8-4072-916a-32393c1afd98)
 
-- Bandwidth and Phase Margin <br>
+- Bandwidth and Phase Margin
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/b72bcfb2-99b3-417a-8aae-e31b2d1fee59" alt="Screenshot" />
-</p>
+  <p align="center">
+    <img src="https://github.com/user-attachments/assets/b72bcfb2-99b3-417a-8aae-e31b2d1fee59" alt="Bandwidth and Phase Margin" />
+  </p>
 
 - Gain and Phase Plot
-  
-![Screenshot 2025-04-11 180823](https://github.com/user-attachments/assets/dc5dd779-621d-4228-af5d-839a0d8aea46)
+
+  ![Gain and Phase](https://github.com/user-attachments/assets/dc5dd779-621d-4228-af5d-839a0d8aea46)
 
 - Gain Plot
-  
-![Screenshot 2025-04-11 180835](https://github.com/user-attachments/assets/7bff8704-ffa7-4256-8acc-5c6ac2d46012)
+
+  ![Gain](https://github.com/user-attachments/assets/7bff8704-ffa7-4256-8acc-5c6ac2d46012)
 
 - PSRR
 
-![Screenshot 2025-04-11 180604](https://github.com/user-attachments/assets/28aa9bea-8f71-4ae2-b5c1-8851d846f7d2)
+  ![PSRR](https://github.com/user-attachments/assets/28aa9bea-8f71-4ae2-b5c1-8851d846f7d2)
+
+---
+
+## 6. Repository structure
+
+```
+.
+├── Design Files/
+│   ├── RAMP.zip                          # all xschem schematics/symbols, zipped
+│   └── RAMP/
+│       ├── Fully-Diff-RAMP/              # top-level differential ringamp + stages
+│       │   ├── RAMP-FD.sch / RAMP.sch    # top-level variants
+│       │   ├── STG1.sch, STG1-CM.sch     # stage 1 + its CMFB
+│       │   ├── STG2.sch                  # stage 2 (current-starved deadzone)
+│       │   └── STG2_Replica.sch          # bias-only replica for the regulation loop
+│       ├── OTA/                          # NOTA / POTA error-amplifier blocks
+│       ├── RAMP-Test/                    # closed-loop / open-loop testbenches
+│       ├── STG2/DZD_Trk_STG2_try*.sch    # deadzone regulation loop, standalone testbench
+│       └── STG3/Deadzone_try*.sch        # stage-3/deadzone generation + AC testbench
+└── Thesis/
+    └── VenkatachalaPraveenkumar2019.pdf  # full dissertation this repo implements
+```
+
+---
+
+## References
+
+The full reference list, small-signal derivations, and the large-signal passive-compensation technique (Chapter 4) are in the included dissertation: [`Thesis/VenkatachalaPraveenkumar2019.pdf`](Thesis/VenkatachalaPraveenkumar2019.pdf).
