@@ -1,0 +1,1 @@
+RAMP_LR: 109.0 um x 182.7 um (19921 um^2), 27 spine columns, 460 stubs -> /home/nithin/work/PVT-Invariant-Ring-Amplifier/layout/RAMP_LR.gds

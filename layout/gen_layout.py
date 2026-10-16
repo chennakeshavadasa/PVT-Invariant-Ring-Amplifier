@@ -1,14 +1,15 @@
 """Matched layout of RAMP_LR in IHP SG13G2 (run with: klayout -b -r layout/gen_layout.py).
 
-Floor plan (bottom to top): one row of unit transistors per matching group, each
-row framed by a gate channel below it and a source/drain channel above it.
+Floor plan: two columns of rows with a Metal3 routing spine between them.  The
+rows are grouped in bands (ramp_lr_design.BANDS); the left and right row of a
+band share one gate channel below them and one source/drain channel above them.
   * every MOS unit is an IHP PCell (ng = 1); all units of a row have the same
     W/L and orientation (source left, drain right), common-centroid/inter-
     digitated as listed in ramp_lr_design.ROWS, with dummies at the row ends,
   * gates are contacted below the unit, source/drain above, on Metal1 stubs,
   * each channel has one horizontal Metal2 track per net,
   * nets that appear in more than one channel get a vertical Metal3 column in
-    a routing spine on the right; top-level pins are labelled on Metal3,
+    the spine; top-level pins are labelled on Metal3,
   * every row has a continuous substrate/well tie strip (LU rules),
   * the two 2 pF MIM capacitors sit on Metal5/TopMetal1 above the spine.
 """
@@ -28,6 +29,8 @@ import sg13g2_pycell_lib  # noqa: E402,F401  (registers the SG13_dev PCell libra
 import ramp_lr_design as D  # noqa: E402
 
 OUT_GDS = os.path.join(HERE, "RAMP_LR.gds")
+OUT_JSON = os.path.join(HERE, "RAMP_LR_placement.json")
+PLACEMENT = {"rows": {}, "mims": [], "spine": None, "bands": []}
 LY = pya.Layout()
 LY.dbu = 0.001
 TOP = LY.create_cell(D.TOP)
@@ -82,30 +85,26 @@ DEVS = {d["name"]: d for d in D.flatten()}
 RAIL = {"n": "GND", "p": "VDD"}
 POWER = {"VDD", "GND", "Vout"}
 PORTS = D.CELLS[D.TOP]["ports"]
+ROWDEF = {r["name"]: r for r in D.ROWS}
 
 UNIT_GAP = 0.60          # Activ-to-Activ space between units
 TRACK_PITCH = 0.90       # Metal2 track pitch in a channel
 TAP_GAP = 0.80           # unit Activ to tie strip
 TAP_W = 0.40             # tie strip width (Activ)
 COL_PITCH = 1.20         # Metal3 spine column pitch
-
-stubs = []   # (channel_id, net, x, y_terminal, width)
-channels = OrderedDict()   # id -> dict(y0=..., nets=[...])
+END = 1.2                # row end margin (tie contact)
+RES_PITCH = 2.4          # rhigh segment pitch
+X0 = 2.0
 
 
 class Channel:
     def __init__(self, cid):
         self.cid = cid
         self.terms = []          # (net, x, y_term, width)
+        self.order = []          # nets in track order (from the dry run)
 
     def add(self, net, x, y, w):
         self.terms.append((net, x, y, w))
-
-    def nets(self):
-        seen = OrderedDict()
-        for n, *_ in self.terms:
-            seen[n] = 1
-        return list(seen)
 
 
 CH = OrderedDict()
@@ -117,34 +116,71 @@ def channel(cid):
     return CH[cid]
 
 
+def mos_cell(r):
+    return pcell(D.KINDS[r["kind"]][2], w=f"{r['w']}u", l=f"{r['l']}u", ng="1")
+
+
+def res_cell():
+    rr = D.RES_ROW
+    return pcell("rhigh", w=f"{rr['w']}u", l=f"{rr['l']:.4f}u")
+
+
+def res_nets():
+    """(bottom net, top net) of each rhigh segment: 4 segments in series per resistor."""
+    seen, out = defaultdict(int), []
+    for u in D.RES_ROW["units"]:
+        k = seen[u]
+        seen[u] += 1
+        p, m = DEVS[u]["pins"]["P"], DEVS[u]["pins"]["M"]
+        bot = [p, f"{u}.mid1", f"{u}.mid1", m][k]
+        top = [f"{u}.mid0", f"{u}.mid0", f"{u}.mid2", f"{u}.mid2"][k]
+        out.append((bot, top))
+    return out
+
+
+def row_nets(name):
+    """Nets a row puts into its gate channel and its source/drain channel (dry run)."""
+    if name == "cm_res":
+        rn = res_nets()
+        return [b for b, _ in rn], [t for _, t in rn]
+    r = ROWDEF[name]
+    rail = RAIL[r["kind"][0]]
+    g, sd = [], [rail]
+    for u in r["units"]:
+        pins = dict(S=rail, D=rail, G=rail) if u == "D" else DEVS[u]["pins"]
+        g.append(pins["G"])
+        sd += [pins["S"], pins["D"]]
+    return g, sd
+
+
+def row_width(name):
+    if name is None:
+        return 0.0
+    if name == "cm_res":
+        return END + len(D.RES_ROW["units"]) * RES_PITCH
+    r = ROWDEF[name]
+    aw = shapes_of(mos_cell(r), "Activ")[0].width() / 1000
+    return 2 * END + len(r["units"]) * (aw + UNIT_GAP) - UNIT_GAP
+
+
 # ----------------------------------------------------------------------------
 # Rows of unit transistors
 # ----------------------------------------------------------------------------
-ROW_ORDER = ["bias_n0", "bias_n1", "bias_n2", "bias_p", "pota_ld", "nota_in", "out_n",
-             "pota_in", "nota_ld", "in_pairs", "s1_loads", "min_n", "min_p", "out_p"]
-ROWDEF = {r["name"]: r for r in D.ROWS}
-X0 = 2.0
-row_extent = {}
-
-
-def build_row(r, y):
-    """Place one row with its bottom (gate) channel below y and S/D channel above."""
+def build_row(r, y, x_start, gch, sch):
+    """Place one row at (x_start, y); gate terminals go to gch, S/D terminals to sch."""
     kind = r["kind"]
     pol = kind[0]
-    cell = pcell(D.KINDS[kind][2], w=f"{r['w']}u", l=f"{r['l']}u", ng="1")
+    cell = mos_cell(r)
     act = shapes_of(cell, "Activ")[0]
     gate = shapes_of(cell, "GatPoly")[0]
     m1 = sorted(shapes_of(cell, "Metal1"), key=lambda b: b.left)
     aw, ah = act.width() / 1000, act.height() / 1000
-    gch, sch = channel(r["name"] + ".g"), channel(r["name"] + ".sd")
-    x = X0 + 1.2                       # room for the tie contact at the left end
-    gaps = []                          # x centres of the gaps between units
+    x = x_start + END                  # room for the tie contact at the left end
+    gaps, units = [], []
     for u in r["units"]:
         place(cell, x, y)
-        if u == "D":
-            nets = dict(S=RAIL[pol], D=RAIL[pol], G=RAIL[pol])
-        else:
-            nets = DEVS[u]["pins"]
+        units.append(dict(ref=u, x0=round(x, 3), x1=round(x + aw, 3)))
+        nets = dict(S=RAIL[pol], D=RAIL[pol], G=RAIL[pol]) if u == "D" else DEVS[u]["pins"]
         for side, b in zip(("S", "D"), m1):
             sch.add(nets[side], x + b.center().x / 1000, y + b.top / 1000, 0.16)
         # gate contact below the unit: poly neck + pad, Cont, Metal1 pad
@@ -163,7 +199,7 @@ def build_row(r, y):
     gaps = gaps[:-1]
     # tie strip above the units, contacted at both ends
     ty0 = y + ah + TAP_GAP
-    tx0, tx1 = X0, x_end + 1.2
+    tx0, tx1 = x_start, x_end + END
     box("Activ", tx0, ty0, tx1, ty0 + TAP_W)
     if pol == "n":
         box("pSD", tx0 - 0.1, ty0 - 0.1, tx1 + 0.1, ty0 + TAP_W + 0.1)
@@ -177,41 +213,36 @@ def build_row(r, y):
         box("Cont", cx - 0.08, ty0 + 0.12, cx + 0.08, ty0 + 0.28)
         box("Metal1", cx - 0.13, ty0 + 0.02, cx + 0.13, ty0 + 0.38)
     # row-level implant / well / oxide so that unit shapes merge cleanly
-    ux0, ux1 = X0 + 1.2, x_end
+    ux0, ux1 = x_start + END, x_end
     if pol == "p":
         e = 0.62 if kind.endswith("hv") else 0.31
         box("NWell", tx0 - e, y - 0.40 - e, tx1 + e, ty0 + TAP_W + e)
         box("pSD", ux0 - 0.18, y - 0.40, ux1 + 0.18, y + ah + 0.40)
     if kind.endswith("hv"):
         box("ThickGateOx", tx0 - 0.7, y - 1.2, tx1 + 0.7, ty0 + TAP_W + 0.7)
-    row_extent[r["name"]] = (X0, tx1, y - 1.0, ty0 + TAP_W)
+    PLACEMENT["rows"][r["name"]] = dict(kind=kind, w=r["w"], l=r["l"], y0=round(y, 3), y1=round(y + ah, 3),
+                                        tap=[round(ty0, 3), round(ty0 + TAP_W, 3)], units=units)
     return ty0 + TAP_W     # top of the row (tie strip)
 
 
-# ----------------------------------------------------------------------------
-# Resistor block (rhigh, common centroid R1a R3a R3b R1b)
-# ----------------------------------------------------------------------------
-def build_res(y):
+def build_res(y, x_start, gch, sch):
+    """rhigh segments, ABBAABBA; bottom terminals to gch, top terminals to sch."""
     rr = D.RES_ROW
-    cell = pcell("rhigh", w=f"{rr['w']}u", l=f"{rr['l']:.3f}u")
+    cell = res_cell()
     m1 = sorted(shapes_of(cell, "Metal1"), key=lambda b: b.bottom)
-    gch, sch = channel("cm_res.g"), channel("cm_res.sd")
-    x = X0 + 1.2
-    seen = defaultdict(int)
-    for u in rr["units"]:
+    rb = LY.cell(cell).bbox()
+    x = x_start + END
+    units = []
+    for u, (bot, top) in zip(rr["units"], res_nets()):
         place(cell, x, y)
-        d = DEVS[u]
-        k = seen[u]
-        seen[u] += 1
-        mid = u + ".mid"
-        a, b = d["pins"]["P"], d["pins"]["M"]
-        bot_net = a if k == 0 else b         # first half: P..mid, second half: mid..M
+        units.append(dict(ref=u, x0=round(x + rb.left / 1000, 3), x1=round(x + rb.right / 1000, 3)))
         cx = x + m1[0].center().x / 1000
-        gch.add(bot_net, cx, y + m1[0].bottom / 1000, 0.30)
-        sch.add(mid, cx, y + m1[1].top / 1000, 0.30)
-        x += 2.4
-    top = y + LY.cell(cell).bbox().top / 1000
-    row_extent["cm_res"] = (X0, x, y + LY.cell(cell).bbox().bottom / 1000, top)
+        gch.add(bot, cx, y + m1[0].bottom / 1000, 0.30)
+        sch.add(top, cx, y + m1[1].top / 1000, 0.30)
+        x += RES_PITCH
+    top = y + rb.top / 1000
+    PLACEMENT["rows"]["cm_res"] = dict(kind="rhigh", w=rr["w"], l=rr["l"], y0=round(y, 3), y1=round(top, 3),
+                                       units=units)
     return top
 
 
@@ -222,75 +253,66 @@ def net_width(n):
     return 0.50 if n in POWER else 0.30
 
 
-def channel_height(ch):
-    return 0.6 + TRACK_PITCH * len(ch.nets())
-
-
 track_y = {}      # (cid, net) -> y
 
 
-def lay_channel(ch, y0):
-    """Assign tracks bottom-up starting at y0; return the channel top."""
-    for i, n in enumerate(ch.nets()):
+def assign_tracks(ch, y0):
+    """Tracks bottom-up from y0 in the dry-run net order; return the channel top."""
+    for i, n in enumerate(ch.order):
         track_y[(ch.cid, n)] = y0 + 0.5 + i * TRACK_PITCH
-    return y0 + channel_height(ch)
+    return y0 + 0.6 + TRACK_PITCH * len(ch.order)
+
+
+MIM_DEF = (("x3.CDP", "VCTRLP", "VDD"), ("x3.CDN", "VCTRLN", "GND"))
+MIM_W = 36.5
+
+
+def mim_geom(i):
+    """MIM origin, bottom-plate via y and top-plate strap via y (stacked above y = 4 um)."""
+    bb = LY.cell(pcell("cmim", w=f"{MIM_W}u", l=f"{MIM_W}u")).bbox()
+    y0 = 4.0 + i * (bb.height() / 1000 + 5.0)
+    return y0, y0 + MIM_W / 2, y0 + bb.top / 1000 + 2.4
 
 
 def main():
-    y = 2.0
-    order = []
-    for name in ROW_ORDER[:10]:
-        order.append(("row", name))
-    order.append(("res", "cm_res"))
-    for name in ROW_ORDER[10:]:
-        order.append(("row", name))
-    tops = {}
-    for kind, name in order:
-        gate_ch_y0 = y
-        if kind == "row":
-            r = ROWDEF[name]
-            # gate channel height from the number of distinct gate nets
-            gnets = OrderedDict()
-            for u in r["units"]:
-                gnets[RAIL[r["kind"][0]] if u == "D" else DEVS[u]["pins"]["G"]] = 1
-            gh = 0.6 + TRACK_PITCH * len(gnets)
-            for i, n in enumerate(gnets):
-                track_y[(name + ".g", n)] = y + 0.5 + i * TRACK_PITCH
-            ry = y + gh + 1.0
-            rtop = build_row(r, ry)
-        else:
-            nets = OrderedDict()
-            for u in D.RES_ROW["units"]:
-                nets.setdefault(u, 0)
-            bn = []
-            seen = defaultdict(int)
-            for u in D.RES_ROW["units"]:
-                k = seen[u]
-                seen[u] += 1
-                bn.append(DEVS[u]["pins"]["P"] if k == 0 else DEVS[u]["pins"]["M"])
-            bn = list(OrderedDict.fromkeys(bn))
-            gh = 0.6 + TRACK_PITCH * len(bn)
-            for i, n in enumerate(bn):
-                track_y[("cm_res.g", n)] = y + 0.5 + i * TRACK_PITCH
-            ry = y + gh + 1.2
-            rtop = build_res(ry)
-        sd = CH[name + ".sd"]
-        y = lay_channel(sd, rtop + 0.6)
-        tops[name] = y
-        y += 0.8
-    height = y
-
-    # spine columns for nets in more than one channel (and all top ports)
+    # 1) dry run: nets of every channel -> spine nets and column positions
+    bands = []
+    for i, (left, right) in enumerate(D.BANDS):
+        g, sd = channel(f"b{i}.g"), channel(f"b{i}.sd")
+        for name in (left, right):
+            if name:
+                gn, sn = row_nets(name)
+                for ch, nets in ((g, gn), (sd, sn)):
+                    for n in nets:
+                        if n not in ch.order:
+                            ch.order.append(n)
+        bands.append((left, right, g, sd))
     where = defaultdict(set)
     for ch in CH.values():
-        for n in ch.nets():
+        for n in ch.order:
             where[n].add(ch.cid)
-    spine_nets = [n for n in PORTS] + sorted(n for n, s in where.items() if len(s) > 1 and n not in PORTS)
-    xmax = max(e[1] for e in row_extent.values())
-    spine_x0 = xmax + 2.0
+    spine_nets = list(PORTS) + sorted(n for n, s in where.items() if len(s) > 1 and n not in PORTS)
+    wl = max(row_width(l) for l, *_ in bands)
+    spine_x0 = X0 + wl + 2.0
     col_x = {n: spine_x0 + i * COL_PITCH for i, n in enumerate(spine_nets)}
+    xr0 = spine_x0 + (len(spine_nets) - 1) * COL_PITCH + 2.0
 
-    # stubs, tracks and vias
+    # 2) place bands bottom-up
+    y = 2.0
+    for left, right, g, sd in bands:
+        y_g = y
+        ry = assign_tracks(g, y) + (1.2 if "cm_res" in (left, right) else 1.0)
+        tops = []
+        for name, x0 in ((left, X0), (right, xr0)):
+            if name == "cm_res":
+                tops.append(build_res(ry, x0, g, sd))
+            elif name:
+                tops.append(build_row(ROWDEF[name], ry, x0, g, sd))
+        y = assign_tracks(sd, max(tops) + 0.6) + 0.8
+        PLACEMENT["bands"].append(dict(left=left, right=right, y0=round(y_g, 3), y1=round(y, 3)))
+    height = y
+
+    # 3) stubs, tracks and vias
     for ch in CH.values():
         span = defaultdict(list)
         for n, x, yt, w in ch.terms:
@@ -302,14 +324,16 @@ def main():
             ty = track_y[(ch.cid, n)]
             x0, x1 = min(xs), max(xs)
             if n in col_x:
-                x1 = max(x1, col_x[n])
+                x0, x1 = min(x0, col_x[n]), max(x1, col_x[n])
                 via(col_x[n], ty, "Metal2", "Metal3")
             hw = net_width(n) / 2
             box("Metal2", x0 - 0.2, ty - hw, x1 + 0.2, ty + hw)
     # Metal3 columns spanning their tracks (and the MIM plate contacts)
     ys = defaultdict(list)
-    for n, yv in mim_points(spine_x0, height):
-        ys[n].append(yv)
+    for i, (_, plate, top_net) in enumerate(MIM_DEF):
+        _, yp, ysv = mim_geom(i)
+        ys[plate].append(yp)
+        ys[top_net].append(ysv)
     for (cid, n), ty in track_y.items():
         if n in col_x:
             ys[n].append(ty)
@@ -323,43 +347,29 @@ def main():
             box("M3pin", x - hw, hi - 0.5, x + hw, hi + 0.3)
             TOP.shapes(L["M3text"]).insert(pya.Text(n, pya.Trans(um(x), um(hi - 0.1))))
 
-    # MIM decoupling capacitors above the spine
-    mims(col_x, spine_x0, height)
-    LY.write(OUT_GDS)
-    bb = TOP.bbox()
-    print(f"RAMP_LR: {bb.width() / 1000:.1f} um x {bb.height() / 1000:.1f} um, "
-          f"{len(spine_nets)} spine columns, {sum(len(c.terms) for c in CH.values())} stubs -> {OUT_GDS}")
-
-
-MIM_DEF = (("x3.CDP", "VCTRLP", "VDD"), ("x3.CDN", "VCTRLN", "GND"))
-
-
-def mim_geom(i):
-    bb = LY.cell(pcell("cmim", w="36.5u", l="36.5u")).bbox()
-    y0 = 10.0 + i * 50.0
-    return y0, y0 + 18.0, y0 + bb.top / 1000 + 3.0      # origin, plate via, strap via
-
-
-def mim_points(spine_x0, height):
-    pts = []
-    for i, (_, plate, top_net) in enumerate(MIM_DEF):
-        y0, yp, ys_ = mim_geom(i)
-        pts += [(plate, yp), (top_net, ys_)]
-    return pts
-
-
-def mims(col_x, spine_x0, height):
-    """CDP: VCTRLP / VDD, CDN: VCTRLN / GND.  Bottom plate (Metal5) on VCTRL."""
-    c = pcell("cmim", w="36.5u", l="36.5u")
+    # 4) MIM decoupling capacitors over the spine (Metal5 / TopMetal1 only)
+    c = pcell("cmim", w=f"{MIM_W}u", l=f"{MIM_W}u")
+    xm = (spine_x0 + col_x[spine_nets[-1]]) / 2 - MIM_W / 2
     for i, (name, plate, top_net) in enumerate(MIM_DEF):
-        x0 = spine_x0 - 4.0
         y0, yp, sy = mim_geom(i)
-        place(c, x0, y0)
+        place(c, xm, y0)
+        PLACEMENT["mims"].append(dict(ref=name, x0=xm, y0=y0, x1=xm + MIM_W, y1=y0 + MIM_W))
         # bottom plate: via stack Metal3 -> Metal5 under the plate on the VCTRL column
         via(col_x[plate], yp, "Metal3", "Metal5", 2)
         # top plate: TopMetal1 strap out of the plate to a stack on the rail column
-        box("TopMetal1", col_x[top_net] - 1.0, y0 + 30.0, col_x[top_net] + 1.0, sy + 1.0)
+        box("TopMetal1", col_x[top_net] - 1.0, y0 + MIM_W - 6.0, col_x[top_net] + 1.0, sy + 1.0)
         via(col_x[top_net], sy, "Metal3", "TopMetal1", 2)
+
+    LY.write(OUT_GDS)
+    import json
+    PLACEMENT["spine"] = dict(x0=spine_x0, x1=col_x[spine_nets[-1]], nets=spine_nets)
+    bb = TOP.bbox()
+    PLACEMENT["bbox"] = [bb.left / 1000, bb.bottom / 1000, bb.right / 1000, bb.top / 1000]
+    with open(OUT_JSON, "w") as fh:
+        json.dump(PLACEMENT, fh, indent=1)
+    print(f"RAMP_LR: {bb.width() / 1000:.1f} um x {bb.height() / 1000:.1f} um "
+          f"({bb.width() * bb.height() / 1e6:.0f} um^2), {len(spine_nets)} spine columns, "
+          f"{sum(len(c.terms) for c in CH.values())} stubs -> {OUT_GDS}")
 
 
 main()

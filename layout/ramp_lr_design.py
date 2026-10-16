@@ -177,22 +177,29 @@ CELLS = {
 # (diff pairs: ABBA), mirrors are interdigitated around their reference.
 # --------------------------------------------------------------------------
 def _bias_grid():
-    """3 x 9 common-centroid array for the NMOS bias mirror (25 units + 2 dummies)."""
-    A, B, C_, E, F, G, D = "xb.MB0", "xb.MB1", "xb.MB2", "xb.MB3", "xb.MB4", "xb.MB5", "D"
+    """6 x 5 common-centroid array for the NMOS bias mirror (25 units + 5 dummies).
+
+    Every multi-unit device occupies point-symmetric pairs about the array
+    centre, so its centroid coincides with that of the reference R."""
+    R, T, C_, N, Q, P, D = "xb.MB0", "xb.MB1", "xb.MB2", "xb.MB3", "xb.MB4", "xb.MB5", "D"
     return [
-        [D, B, C_, B, E, C_, B, C_, B],
-        [C_, B, C_, F, A, G, C_, B, C_],
-        [B, C_, B, C_, E, B, C_, B, D],
+        [D, T, C_, T, D],
+        [T, C_, N, T, C_],
+        [C_, T, R, P, C_],
+        [C_, D, Q, T, C_],
+        [C_, T, N, C_, T],
+        [D, T, C_, T, D],
     ]
 
 
-ROWS = [
-    # name, kind, w, l, units (left -> right)
-    dict(name="bias_n0", kind="nlv", w=WB, l=LB, units=_bias_grid()[0]),
-    dict(name="bias_n1", kind="nlv", w=WB, l=LB, units=_bias_grid()[1]),
-    dict(name="bias_n2", kind="nlv", w=WB, l=LB, units=_bias_grid()[2]),
-    dict(name="bias_p", kind="plv", w=WB, l=LB,
-         units=["D", "xb.MB8", "xb.MB6", "xb.MB7", "xb.MB8", "D"]),
+def _bias_p_grid():
+    """2 x 3 array for the PMOS mirror: diode MB6 and MB7 adjacent, MB8 cross-coupled."""
+    return [["D", "xb.MB7", "xb.MB8"], ["xb.MB8", "xb.MB6", "D"]]
+
+
+ROWS = [dict(name=f"bias_n{i}", kind="nlv", w=WB, l=LB, units=u) for i, u in enumerate(_bias_grid())]
+ROWS += [dict(name=f"bias_p{i}", kind="plv", w=WB, l=LB, units=u) for i, u in enumerate(_bias_p_grid())]
+ROWS += [
     dict(name="in_pairs", kind="nlv", w=1.56, l=0.5,
          units=["D", "x1.MN1", "x1.MN2", "x1.MN2", "x1.MN1", "D",
                 "D", "x1.MC1", "x1.MC2", "x1.MC2", "x1.MC1", "D", "x3.MCN"]),
@@ -220,10 +227,17 @@ ROWS = [
          units=["D", "M2", "M2", "x3.MP_STG2_3P_R", "M2", "M2", "D"]),
 ]
 
-# rhigh resistors: each 100 kOhm resistor is split into two series halves laid
-# out common-centroid (R1a R3a R3b R1b); LVS merges series segments.
-RES_ROW = dict(name="cm_res", w=0.5, l=33.7 / 2, units=["x1.R1", "x1.R3", "x1.R3", "x1.R1"])
+# rhigh resistors: each 100 kOhm resistor is split into four series segments
+# laid out common-centroid (ABBAABBA); LVS merges the series segments.
+RES_ROW = dict(name="cm_res", w=0.5, l=33.7 / 4,
+               units=["x1.R1", "x1.R3", "x1.R3", "x1.R1", "x1.R1", "x1.R3", "x1.R3", "x1.R1"])
 MIMS = ["x3.CDP", "x3.CDN"]
+
+# floor plan: two columns of rows with the routing spine between them; each band
+# holds a left and a right row that share the band's gate and source/drain channels
+BANDS = [("bias_n0", "pota_ld"), ("bias_n1", "nota_in"), ("bias_n2", "pota_in"),
+         ("bias_n3", "nota_ld"), ("bias_n4", "out_n"), ("bias_n5", "in_pairs"),
+         ("bias_p0", "cm_res"), ("bias_p1", "s1_loads"), ("min_n", "out_p"), ("min_p", None)]
 
 
 def dummy_cell():
