@@ -42,7 +42,7 @@ N 430 70 430 90 {lab=net3}
 C {lab_pin.sym} 430 90 0 1 {name=l4 sig_type=std_logic lab=net3}
 C {sg13g2_pr/sg13_lv_nmos.sym} 760 40 0 0 {name=MN1
 l=0.5u
-w=1.563u
+w=1.56u
 ng=1
 m=2
 model=sg13_lv_nmos
@@ -58,7 +58,7 @@ N 740 40 710 40 {lab=Vip}
 C {lab_pin.sym} 710 40 0 0 {name=l8 sig_type=std_logic lab=Vip}
 C {sg13g2_pr/sg13_lv_nmos.sym} 1090 40 0 0 {name=MN2
 l=0.5u
-w=1.563u
+w=1.56u
 ng=1
 m=2
 model=sg13_lv_nmos
@@ -106,7 +106,7 @@ N 80 260 50 260 {lab=vcmfb}
 C {lab_pin.sym} 50 260 0 0 {name=l20 sig_type=std_logic lab=vcmfb}
 C {sg13g2_pr/sg13_lv_nmos.sym} 430 260 0 0 {name=MC1
 l=0.5u
-w=1.563u
+w=1.56u
 ng=1
 m=2
 model=sg13_lv_nmos
@@ -122,7 +122,7 @@ N 410 260 380 260 {lab=V1_CM}
 C {lab_pin.sym} 380 260 0 0 {name=l24 sig_type=std_logic lab=V1_CM}
 C {sg13g2_pr/sg13_lv_nmos.sym} 760 260 0 0 {name=MC2
 l=0.5u
-w=1.563u
+w=1.56u
 ng=1
 m=2
 model=sg13_lv_nmos

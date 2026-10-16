@@ -3,3 +3,4 @@ simulations/
 *.raw
 sim/build/
 __pycache__/
+layout/build/

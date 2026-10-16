@@ -121,7 +121,7 @@ N 1400 360 1420 360 {lab=VDD}
 C {lab_pin.sym} 1420 360 0 1 {name=l43 sig_type=std_logic lab=VDD}
 N 1360 360 1330 360 {lab=mp_dz}
 C {lab_pin.sym} 1330 360 0 0 {name=l44 sig_type=std_logic lab=mp_dz}
-C {RAMP-LR/DUMMY_LR.sym} 2120 360 0 0 {name=xd}
+C {RAMP-LR/DUMMY_LR.sym} 2120 360 0 0 {name=xd lvs_ignore=open}
 N 2270 360 2300 360 {lab=VDD}
 C {lab_pin.sym} 2300 360 0 1 {name=l45 sig_type=std_logic lab=VDD}
 N 2270 380 2300 380 {lab=GND}

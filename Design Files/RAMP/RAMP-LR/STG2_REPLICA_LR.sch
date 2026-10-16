@@ -176,10 +176,10 @@ l=36.5e-6
 m=1
 spiceprefix=X
 }
-N 1380 650 1380 630 {lab=VCTRLP}
-C {lab_pin.sym} 1380 630 0 1 {name=l45 sig_type=std_logic lab=VCTRLP}
-N 1380 710 1380 730 {lab=VDD}
-C {lab_pin.sym} 1380 730 0 1 {name=l46 sig_type=std_logic lab=VDD}
+N 1380 650 1380 630 {lab=VDD}
+C {lab_pin.sym} 1380 630 0 1 {name=l45 sig_type=std_logic lab=VDD}
+N 1380 710 1380 730 {lab=VCTRLP}
+C {lab_pin.sym} 1380 730 0 1 {name=l46 sig_type=std_logic lab=VCTRLP}
 C {sg13g2_pr/cap_cmim.sym} 2020 680 0 0 {name=CDN
 model=cap_cmim
 w=36.5e-6
@@ -187,8 +187,40 @@ l=36.5e-6
 m=1
 spiceprefix=X
 }
-N 2020 650 2020 630 {lab=VCTRLN}
-C {lab_pin.sym} 2020 630 0 1 {name=l47 sig_type=std_logic lab=VCTRLN}
-N 2020 710 2020 730 {lab=GND}
-C {lab_pin.sym} 2020 730 0 1 {name=l48 sig_type=std_logic lab=GND}
-C {title.sym} 0 1080 0 0 {name=l0 author="Nithin Purushothama"}
+N 2020 650 2020 630 {lab=GND}
+C {lab_pin.sym} 2020 630 0 1 {name=l47 sig_type=std_logic lab=GND}
+N 2020 710 2020 730 {lab=VCTRLN}
+C {lab_pin.sym} 2020 730 0 1 {name=l48 sig_type=std_logic lab=VCTRLN}
+C {sg13g2_pr/sg13_lv_nmos.sym} 100 1000 0 0 {name=MCN
+l=0.5u
+w=1.56u
+ng=1
+m=1
+model=sg13_lv_nmos
+spiceprefix=X
+}
+N 120 970 160 970 {lab=GND}
+C {lab_pin.sym} 160 970 0 1 {name=l49 sig_type=std_logic lab=GND}
+N 120 1030 160 1030 {lab=GND}
+C {lab_pin.sym} 160 1030 0 1 {name=l50 sig_type=std_logic lab=GND}
+N 120 1000 140 1000 {lab=GND}
+C {lab_pin.sym} 140 1000 0 1 {name=l51 sig_type=std_logic lab=GND}
+N 80 1000 50 1000 {lab=VCTRLN}
+C {lab_pin.sym} 50 1000 0 0 {name=l52 sig_type=std_logic lab=VCTRLN}
+C {sg13g2_pr/sg13_lv_pmos.sym} 740 1000 0 0 {name=MCP
+l=0.5u
+w=1.2u
+ng=1
+m=1
+model=sg13_lv_pmos
+spiceprefix=X
+}
+N 760 970 800 970 {lab=VDD}
+C {lab_pin.sym} 800 970 0 1 {name=l53 sig_type=std_logic lab=VDD}
+N 760 1030 800 1030 {lab=VDD}
+C {lab_pin.sym} 800 1030 0 1 {name=l54 sig_type=std_logic lab=VDD}
+N 760 1000 780 1000 {lab=VDD}
+C {lab_pin.sym} 780 1000 0 1 {name=l55 sig_type=std_logic lab=VDD}
+N 720 1000 690 1000 {lab=VCTRLP}
+C {lab_pin.sym} 690 1000 0 0 {name=l56 sig_type=std_logic lab=VCTRLP}
+C {title.sym} 0 1400 0 0 {name=l0 author="Nithin Purushothama"}

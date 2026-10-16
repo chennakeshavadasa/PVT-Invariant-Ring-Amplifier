@@ -101,7 +101,10 @@ def write_sch(cell):
         x, y = 100 + (k % cols) * px_, 40 + (k // cols) * py_
         if it["kind"] == "inst":
             pos = sym_pins(it["cell"])
-            s += f"C {{{LIBDIR}/{it['cell']}.sym}} {x + 100} {y} 0 0 {{name={it['name']}}}\n"
+            # rail-tied dummies: the IHP LVS deck purges shorted devices from the
+            # layout netlist, so the dummy cell is excluded from the LVS netlist
+            extra = " lvs_ignore=open" if it["cell"] == "DUMMY_LR" else ""
+            s += f"C {{{LIBDIR}/{it['cell']}.sym}} {x + 100} {y} 0 0 {{name={it['name']}{extra}}}\n"
             for p, (px, py) in pos.items():
                 net = it["conn"][p]
                 ex = px + (-30 if px < 0 else 30)

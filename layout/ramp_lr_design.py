@@ -13,7 +13,9 @@ devices, so that the circuit can be laid out and checked by DRC/LVS:
   * the deadzone-control nodes VCTRLP/VCTRLN get 2 pF MIM decoupling, which
     stabilises the two regulation loops (phase margin -27 deg / 11 deg -> 83/88 deg),
   * the three NMOS whose body was tied to their source now have body = GND
-    (a standard SG13G2 NMOS sits in the common p-substrate).
+    (a standard SG13G2 NMOS sits in the common p-substrate),
+  * small MOS gate capacitors on VCTRLN/VCTRLP satisfy the antenna rules for
+    the MIM plates (otherwise ~35000x the gate area of the 0.15/0.13 um gates).
 
 gen_schematics.py turns CELLS into xschem schematics/symbols, gen_layout.py
 turns ROWS into the matched layout; the LVS netlist comes from xschem.
@@ -73,12 +75,12 @@ CELLS = {
         items=[
             R("R1", "net2", "net3", 0.5, 33.7),
             R("R3", "Vo1", "net3", 0.5, 33.7),
-            M("MN1", "nlv", "net2", "Vip", "it1", "GND", 1.563, 0.5, 2),
-            M("MN2", "nlv", "Vo1", "Vin", "it1", "GND", 1.563, 0.5, 2),
+            M("MN1", "nlv", "net2", "Vip", "it1", "GND", 1.56, 0.5, 2),
+            M("MN2", "nlv", "Vo1", "Vin", "it1", "GND", 1.56, 0.5, 2),
             M("MP1", "phv", "net2", "vcmfb", "VDD", "VDD", 0.5, 1.0, 2),
             M("MP2", "phv", "Vo1", "vcmfb", "VDD", "VDD", 0.5, 1.0, 2),
-            M("MC1", "nlv", "vcmfb", "V1_CM", "icm", "GND", 1.563, 0.5, 2),
-            M("MC2", "nlv", "dB", "net3", "icm", "GND", 1.563, 0.5, 2),
+            M("MC1", "nlv", "vcmfb", "V1_CM", "icm", "GND", 1.56, 0.5, 2),
+            M("MC2", "nlv", "dB", "net3", "icm", "GND", 1.56, 0.5, 2),
             M("MPC1", "phv", "vcmfb", "vcmfb", "VDD", "VDD", 0.5, 1.0, 2),
             M("MPC2", "phv", "dB", "dB", "VDD", "VDD", 0.5, 1.0, 2),
         ]),
@@ -141,8 +143,12 @@ CELLS = {
             M("MP_STG2_3P_R", "phv", "irn", "irn", "VDD", "VDD", 4.5, 0.5),
             X("x1", "POTA_LR", VDD="VDD", PLUS="net1", MINUS="irp", Vout="VCTRLP", GND="GND", tail="ipota"),
             X("x2", "NOTA_LR", VDD="VDD", Vout="VCTRLN", PLUS="net4", MINUS="irn", GND="GND", tail="inota"),
-            C("CDP", "VCTRLP", "VDD", 36.5, 36.5),
-            C("CDN", "VCTRLN", "GND", 36.5, 36.5),
+            C("CDP", "VDD", "VCTRLP", 36.5, 36.5),
+            C("CDN", "GND", "VCTRLN", 36.5, 36.5),
+            # MOS gate capacitors: keep the MIM plate / gate-area antenna ratio of
+            # VCTRLN/VCTRLP below the SG13G2 limit (Ant.e, 20000 with diode)
+            M("MCN", "nlv", "GND", "VCTRLN", "GND", "GND", 1.56, 0.5),
+            M("MCP", "plv", "VDD", "VCTRLP", "VDD", "VDD", 1.2, 0.5),
         ]),
     "RAMP_LR": dict(
         title="Ring amplifier with deadzone regulation, layout-ready (IHP SG13G2)",
@@ -187,9 +193,9 @@ ROWS = [
     dict(name="bias_n2", kind="nlv", w=WB, l=LB, units=_bias_grid()[2]),
     dict(name="bias_p", kind="plv", w=WB, l=LB,
          units=["D", "xb.MB8", "xb.MB6", "xb.MB7", "xb.MB8", "D"]),
-    dict(name="in_pairs", kind="nlv", w=1.563, l=0.5,
+    dict(name="in_pairs", kind="nlv", w=1.56, l=0.5,
          units=["D", "x1.MN1", "x1.MN2", "x1.MN2", "x1.MN1", "D",
-                "D", "x1.MC1", "x1.MC2", "x1.MC2", "x1.MC1", "D"]),
+                "D", "x1.MC1", "x1.MC2", "x1.MC2", "x1.MC1", "D", "x3.MCN"]),
     dict(name="s1_loads", kind="phv", w=0.5, l=1.0,
          units=["D", "x1.MP1", "x1.MP2", "x1.MPC1", "x1.MPC2", "x1.MPC2", "x1.MPC1", "x1.MP2", "x1.MP1", "D"]),
     dict(name="min_n", kind="nlv", w=0.15, l=0.13,
@@ -201,7 +207,7 @@ ROWS = [
                + ["x2.MP_DZ_STG2_3N", "x3.MP_DZ_STG2_3N", "x4.M11"] * 5
                + ["x2.MP_STG2_3P1", "x3.MP_STG2_3P1", "x4.M13", "D"]),
     dict(name="pota_in", kind="plv", w=1.2, l=0.5,
-         units=["D", "x3.x1.M1", "x3.x1.M2", "x3.x1.M2", "x3.x1.M1", "D"]),
+         units=["D", "x3.x1.M1", "x3.x1.M2", "x3.x1.M2", "x3.x1.M1", "D", "x3.MCP"]),
     dict(name="pota_ld", kind="nhv", w=0.5, l=2.0,
          units=["D", "x3.x1.M4", "x3.x1.M5", "x3.x1.M5", "x3.x1.M4", "D"]),
     dict(name="nota_in", kind="nhv", w=1.75, l=1.0,

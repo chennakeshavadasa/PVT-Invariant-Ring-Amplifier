@@ -90,7 +90,7 @@ N 1400 40 1370 40 {lab=GND}
 C {lab_pin.sym} 1370 40 0 0 {name=l20 sig_type=std_logic lab=GND}
 C {sg13g2_pr/sg13_lv_nmos.sym} 100 260 0 0 {name=MD5
 l=0.5u
-w=1.563u
+w=1.56u
 ng=1
 m=4
 model=sg13_lv_nmos
