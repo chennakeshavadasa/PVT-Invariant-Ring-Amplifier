@@ -369,7 +369,7 @@ def main():
         json.dump(PLACEMENT, fh, indent=1)
     print(f"RAMP_LR: {bb.width() / 1000:.1f} um x {bb.height() / 1000:.1f} um "
           f"({bb.width() * bb.height() / 1e6:.0f} um^2), {len(spine_nets)} spine columns, "
-          f"{sum(len(c.terms) for c in CH.values())} stubs -> {OUT_GDS}")
+          f"{sum(len(c.terms) for c in CH.values())} stubs -> layout/{os.path.basename(OUT_GDS)}")
 
 
 main()
