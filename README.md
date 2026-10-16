@@ -550,7 +550,7 @@ replica references, D dummy. (b) Stage-1 pair A/B and CMFB pair C/E, ABBA, with 
 loads A/B and CMFB diodes C/E. (d), (e) Output devices M around their replica R.</p>
 
 The layout is not optimised for parasitics: the tracks of a differential pair have different lengths to their spine
-columns, and no post-layout extraction has been simulated (Section VIII).
+columns, and no post-layout simulation has been done yet (Section VIII).
 
 ### C. Physical verification
 
@@ -620,7 +620,11 @@ healthy. A layout-ready version with stable internal loops has a matched, DRC-, 
 
 **Limitations.**
 
-1. *Simulation only.* No silicon; no post-layout (parasitic-extracted) simulation; no Monte Carlo mismatch analysis.
+1. *Simulation only.* No silicon and no Monte Carlo mismatch analysis. No post-layout simulation either: a magic
+   extraction of the layout matches the schematic in netgen LVS, but its netlist with parasitic capacitances does not
+   yet reproduce the DC operating point in ngspice and needs more work. The nodes most at risk are the outputs of
+   stages 1 and 2: high-impedance nodes driven by small devices and routed over long Metal2 tracks to the spine, whose
+   capacitance moves the non-dominant poles and therefore the phase margin.
 2. *Transistor CMFB.* DC PSRR 33 dB instead of 93 dB, 1.5 % common-mode-dependent gain error in the buffer, and loss of
    headroom at 125 °C and low supply (Section V-F).
 3. *Temperature.* Constant $I_Q$ is not constant $g_{m3}$; the regulated UGF still falls 3.5× from −40 °C to 125 °C at TT
