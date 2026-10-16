@@ -58,8 +58,8 @@ T_EDGE, T_FALL, T_STOP = 100e-9, 600e-9, 1100e-9
 # switched-capacitor (charge-transfer) amplifier test, as in thesis Fig. 2.2/3.4:
 # inverting gain CS/CF = 1, inputs held at the virtual ground, CL = 50 pF
 CS, CF = 5e-12, 5e-12
-SC_EDGES = [(100e-9, +0.2, 1000e-9), (1100e-9, -0.2, 1000e-9),     # large steps
-            (2100e-9, +0.004, 2000e-9), (4100e-9, -0.004, 2000e-9)]  # small steps
+SC_EDGES = [(100e-9, +0.004, 2000e-9), (2100e-9, -0.004, 2000e-9),  # small steps first,
+            (4100e-9, +0.2, 1000e-9), (5100e-9, -0.2, 1000e-9)]      # from a settled state
 SC_STOP = 6100e-9
 
 
@@ -444,7 +444,8 @@ def main() -> int:
             save_resampled(d / "tran.dat", RESULTS / f"tran_{tag}_{t}.dat", 0.5e-9)
         elif kind == "orig":
             shutil.copy(d / "loop.dat", RESULTS / f"loop_orig_{c[4:]}_27.dat")
-        elif kind == "sc" and vdd == VDD0 and t == 27 and bias != "ptat":
+        elif kind == "sc" and vdd == VDD0 and bias != "ptat" and (
+                t == 27 or (c[4:], t) in (("ss", -40), ("sf", -40), ("ff", 125))):
             save_resampled(d / "sc.dat", RESULTS / f"sc_{tag}_{t}.dat", 2e-9)
         elif kind == "power":
             shutil.copy(d / "power.dat", RESULTS / "power_tt_27.dat")
