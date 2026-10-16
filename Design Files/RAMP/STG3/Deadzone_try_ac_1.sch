@@ -123,7 +123,7 @@ footprint=1206
 device="ceramic capacitor"}
 C {gnd.sym} 1180 -30 0 0 {name=l10 lab=GND}
 C {lab_pin.sym} 1180 -200 0 1 {name=p5 sig_type=std_logic lab=Vout}
-C {/foss/designs/fd_pr/sg13_hv_nmos.sym} 290 -140 0 0 {name=M1
+C {sg13g2_pr/sg13_hv_nmos.sym} 290 -140 0 0 {name=M1
 l=1u
 w=2.3u
 ng=1
@@ -131,7 +131,7 @@ m=1
 model=sg13_hv_nmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_hv_pmos.sym} 620 -210 0 0 {name=M2
+C {sg13g2_pr/sg13_hv_pmos.sym} 620 -210 0 0 {name=M2
 l=0.5u
 w=4.5u
 ng=1
@@ -139,7 +139,7 @@ m=1
 model=sg13_hv_pmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_hv_pmos.sym} 960 -290 0 0 {name=M4
+C {sg13g2_pr/sg13_hv_pmos.sym} 960 -290 0 0 {name=M4
 l=0.5u
 w=4.5u
 ng=1
@@ -147,7 +147,7 @@ m=1
 model=sg13_hv_pmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_hv_nmos.sym} 960 -110 0 0 {name=M3
+C {sg13g2_pr/sg13_hv_nmos.sym} 960 -110 0 0 {name=M3
 l=1u
 w=2.3u
 ng=1

@@ -278,6 +278,6 @@ m=2
 model=sg13_lv_nmos
 spiceprefix=X
 }
-C {/foss/designs/RAMP/OTA/NOTA3.sym} 1220 -60 1 1 {name=x1}
+C {OTA/NOTA3.sym} 1220 -60 1 1 {name=x1}
 C {gnd.sym} 1100 -410 0 0 {name=l10 lab=GND}
 C {vdd.sym} 1340 -410 0 0 {name=l11 lab=VDD}

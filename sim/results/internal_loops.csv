@@ -1,0 +1,19 @@
+design,loop,corner,a0_db,ugf_mhz,pm_deg,gain_at_100GHz_db
+RAMP (original),regulation V_CTRLN,TT,54.3,530.88,-27.1,
+RAMP (original),regulation V_CTRLN,SS,no OP,,,
+RAMP (original),regulation V_CTRLN,FF,52.2,595.66,-24.7,
+RAMP (original),regulation V_CTRLP,TT,43.8,375.84,10.6,
+RAMP (original),regulation V_CTRLP,SS,no OP,,,
+RAMP (original),regulation V_CTRLP,FF,38.7,398.11,19.9,
+RAMP (original),stage-1 CMFB (ideal E1),TT,115.3,,,66.7
+RAMP (original),stage-1 CMFB (ideal E1),SS,no OP,,,
+RAMP (original),stage-1 CMFB (ideal E1),FF,115.8,,,67.1
+RAMP_LR,regulation V_CTRLN,TT,53.5,7.94,83.2,
+RAMP_LR,regulation V_CTRLN,SS,54.9,7.08,81.5,
+RAMP_LR,regulation V_CTRLN,FF,51.3,7.94,84.9,
+RAMP_LR,regulation V_CTRLP,TT,43.4,3.76,88.2,
+RAMP_LR,regulation V_CTRLP,SS,45.8,3.55,88.0,
+RAMP_LR,regulation V_CTRLP,FF,38.7,3.76,88.7,
+RAMP_LR,stage-1 CMFB (transistor),TT,35.1,105.93,68.4,
+RAMP_LR,stage-1 CMFB (transistor),SS,33.1,84.14,74.2,
+RAMP_LR,stage-1 CMFB (transistor),FF,36.5,133.35,62.6,

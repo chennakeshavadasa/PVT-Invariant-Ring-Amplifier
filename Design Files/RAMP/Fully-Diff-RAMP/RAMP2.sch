@@ -65,7 +65,7 @@ N -30 -120 310 -120 {lab=GND}
 N 310 -480 310 -375 {lab=VDD}
 N -30 -480 310 -480 {lab=VDD}
 N 430 -305 820 -305 {lab=Vo_STG1}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/STG2.sym} 600 -290 0 0 {name=x2}
+C {Fully-Diff-RAMP/STG2.sym} 600 -290 0 0 {name=x2}
 C {sg13g2_pr/sg13_hv_nmos.sym} 1230 -200 0 0 {name=M1
 l=1u
 w=2.3u
@@ -90,10 +90,10 @@ C {title.sym} 155 -35 0 0 {name=l1 author="Nithin Purushothama"}
 C {lab_pin.sym} 470 -305 1 0 {name=p6 sig_type=std_logic lab=Vo_STG1}
 C {lab_pin.sym} 1150 -200 0 0 {name=p7 sig_type=std_logic lab=mn_dz}
 C {lab_pin.sym} 1150 -410 0 0 {name=p8 sig_type=std_logic lab=mp_dz}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/STG2_Replica.sym} 25 -285 0 0 {name=x3}
+C {Fully-Diff-RAMP/STG2_Replica.sym} 25 -285 0 0 {name=x3}
 C {iopin.sym} -170 -480 0 1 {name=p2 lab=VDD}
 C {lab_pin.sym} 410 -240 3 0 {name=p9 sig_type=std_logic lab=V1_CM}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/STG1-CM.sym} -310 -305 0 0 {name=x4}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/STG1_2.sym} 10 -305 0 0 {name=x5}
+C {Fully-Diff-RAMP/STG1-CM.sym} -310 -305 0 0 {name=x4}
+C {Fully-Diff-RAMP/STG1_2.sym} 10 -305 0 0 {name=x5}
 C {sg13g2_pr/annotate_fet_params.sym} 1360 -450 0 0 {name=annot1 ref=M1}
 C {sg13g2_pr/annotate_fet_params.sym} 1350 -260 0 0 {name=annot2 ref=M2}

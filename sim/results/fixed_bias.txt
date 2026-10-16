@@ -1,0 +1,3 @@
+VCTRLP_fixed=0.83105
+VCTRLN_fixed=0.82165
+no_convergence=orig_ss_27

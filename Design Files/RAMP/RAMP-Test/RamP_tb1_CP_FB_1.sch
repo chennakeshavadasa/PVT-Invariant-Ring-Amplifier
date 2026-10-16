@@ -111,5 +111,5 @@ C {lab_pin.sym} 540 -510 3 0 {name=p1 sig_type=std_logic lab=probe}
 C {gnd.sym} 540 -670 2 0 {name=l8 lab=GND}
 C {lab_pin.sym} 380 -250 0 0 {name=p2 sig_type=std_logic lab=VICM}
 C {ngspice_probe.sym} 740 -280 0 0 {name=r2}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/RAMP2.sym} 210 -280 0 0 {name=x1}
+C {Fully-Diff-RAMP/RAMP2.sym} 210 -280 0 0 {name=x1}
 C {lab_pin.sym} 740 -280 0 1 {name=p3 sig_type=std_logic lab=Vout}

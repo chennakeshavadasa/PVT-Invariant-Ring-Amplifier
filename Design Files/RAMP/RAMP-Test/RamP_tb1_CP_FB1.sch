@@ -18,7 +18,7 @@ N 380 -310 460 -310 {lab=Vout}
 N 380 -250 460 -250 {lab=VICM}
 N 380 -450 380 -310 {lab=Vout}
 N 380 -450 740 -450 {lab=Vout}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/RAMP.sym} 280 -280 2 1 {name=x1}
+C {Fully-Diff-RAMP/RAMP.sym} 280 -280 2 1 {name=x1}
 C {vsource.sym} 380 -180 0 0 {name=V1 value="PULSE(0 0.825 1p 10n 10n 500n 1u 1)" savecurrent=false}
 C {vsource.sym} 880 -380 0 0 {name=V2 value="dc 1.65 ac 1" savecurrent=false}
 C {vdd.sym} 880 -430 0 0 {name=l1 lab=VDD}

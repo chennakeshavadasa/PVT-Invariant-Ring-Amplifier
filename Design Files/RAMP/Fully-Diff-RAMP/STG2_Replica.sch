@@ -148,7 +148,7 @@ spiceprefix=X
 }
 C {isource.sym} 725 -405 0 0 {name=I0 value=1u}
 C {ngspice_probe.sym} 615 -305 0 0 {name=r1}
-C {/foss/designs/RAMP/OTA/POTA.sym} 685 125 3 0 {name=x1}
+C {OTA/POTA.sym} 685 125 3 0 {name=x1}
 C {ngspice_probe.sym} 315 -305 0 0 {name=r2}
 C {sg13g2_pr/sg13_hv_pmos.sym} 1485 -325 0 0 {name=MP_STG2_3P_R
 l=0.5u
@@ -160,7 +160,7 @@ spiceprefix=X
 }
 C {isource.sym} 1505 -185 0 0 {name=I1 value=1u}
 C {ngspice_probe.sym} 1395 -285 0 0 {name=r3}
-C {/foss/designs/RAMP/OTA/NOTA.sym} 1275 -685 3 1 {name=x2}
+C {OTA/NOTA.sym} 1275 -685 3 1 {name=x2}
 C {ngspice_probe.sym} 1015 -435 0 0 {name=r4}
 C {ipin.sym} 155 -305 0 0 {name=p5 lab=Vin_STG2}
 C {lab_pin.sym} 855 -435 0 0 {name=p6 sig_type=std_logic lab=Vin_STG2}

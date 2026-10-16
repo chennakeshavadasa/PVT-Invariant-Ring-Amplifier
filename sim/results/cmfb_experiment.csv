@@ -1,0 +1,4 @@
+design,psrr_dc_db,offset_mv,gain_err_pct
+"RAMP (original, ideal E1)",93.0,-0.022,-0.016
+RAMP_LR (transistor CMFB),32.9,-1.133,-1.457
+RAMP_LR with ideal CMFB,89.6,0.0,-0.014

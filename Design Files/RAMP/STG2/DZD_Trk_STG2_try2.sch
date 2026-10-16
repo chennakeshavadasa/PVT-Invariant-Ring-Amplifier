@@ -139,7 +139,7 @@ C {isource.sym} 840 -380 0 0 {name=I0 value=1u}
 C {vdd.sym} 840 -440 0 0 {name=l8 lab=VDD}
 C {gnd.sym} 840 -100 0 0 {name=l10 lab=GND}
 C {ngspice_probe.sym} 730 -280 0 0 {name=r1}
-C {/foss/designs/RAMP/OTA/POTA.sym} 800 150 3 0 {name=x1}
+C {OTA/POTA.sym} 800 150 3 0 {name=x1}
 C {vdd.sym} 550 -400 3 0 {name=l11 lab=VDD}
 C {gnd.sym} 770 -400 0 0 {name=l12 lab=GND}
 C {lab_pin.sym} 650 -560 1 0 {name=p1 sig_type=std_logic lab=X}
@@ -157,7 +157,7 @@ C {isource.sym} 1560 -160 0 0 {name=I1 value=1u}
 C {vdd.sym} 1560 -430 0 0 {name=l13 lab=VDD}
 C {gnd.sym} 1560 -110 0 0 {name=l14 lab=GND}
 C {ngspice_probe.sym} 1450 -260 0 0 {name=r3}
-C {/foss/designs/RAMP/OTA/NOTA.sym} 1330 -660 3 1 {name=x2}
+C {OTA/NOTA.sym} 1330 -660 3 1 {name=x2}
 C {vdd.sym} 1420 -380 1 0 {name=l15 lab=VDD}
 C {gnd.sym} 1230 -380 0 0 {name=l16 lab=GND}
 C {lab_pin.sym} 1330 -210 3 0 {name=p3 sig_type=std_logic lab=Y}
