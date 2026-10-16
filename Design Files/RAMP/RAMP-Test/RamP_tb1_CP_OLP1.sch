@@ -17,7 +17,7 @@ N 890 -310 890 -260 {lab=vout}
 N 400 -240 400 -220 {lab=GND}
 N 400 -340 400 -300 {lab=#net1}
 N 400 -340 610 -340 {lab=#net1}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/RAMP.sym} 430 -310 2 1 {name=x1}
+C {Fully-Diff-RAMP/RAMP.sym} 430 -310 2 1 {name=x1}
 C {vsource.sym} 530 -210 0 0 {name=V1 value="dc 0.825 ac 1" savecurrent=false}
 C {vsource.sym} 310 -300 0 0 {name=V2 value=1.65 savecurrent=false}
 C {vdd.sym} 310 -350 0 0 {name=l1 lab=VDD}

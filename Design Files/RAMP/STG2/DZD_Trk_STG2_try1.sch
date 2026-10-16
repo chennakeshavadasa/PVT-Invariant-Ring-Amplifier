@@ -120,7 +120,7 @@ N -910 -400 -910 -310 {lab=#net11}
 N -810 -370 -810 -310 {lab=#net11}
 N 190 -280 190 -270 {lab=v1_out}
 N 190 -280 270 -280 {lab=v1_out}
-C {/foss/designs/fd_pr/sg13_lv_nmos.sym} 270 -120 0 0 {name=M1
+C {sg13g2_pr/sg13_lv_nmos.sym} 270 -120 0 0 {name=M1
 l=0.13u
 w=0.15u
 ng=1
@@ -128,7 +128,7 @@ m=1
 model=sg13_lv_nmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_lv_pmos.sym} 350 -370 0 0 {name=M2
+C {sg13g2_pr/sg13_lv_pmos.sym} 350 -370 0 0 {name=M2
 l=0.13u
 w=0.15u
 ng=1
@@ -141,7 +141,7 @@ C {vsource.sym} 875 -570 0 0 {name=V2 value=1.65 savecurrent=false}
 C {gnd.sym} 875 -510 0 0 {name=l3 lab=GND}
 C {vdd.sym} 875 -600 0 0 {name=l4 lab=VDD}
 C {gnd.sym} 370 -100 0 0 {name=l5 lab=GND}
-C {/foss/designs/fd_pr/sg13_lv_nmos.sym} 1210 -240 0 0 {name=M4
+C {sg13g2_pr/sg13_lv_nmos.sym} 1210 -240 0 0 {name=M4
 l=0.13u
 w=0.15u
 ng=1
@@ -149,7 +149,7 @@ m=1
 model=sg13_lv_nmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_lv_pmos.sym} 1290 -490 0 0 {name=M5
+C {sg13g2_pr/sg13_lv_pmos.sym} 1290 -490 0 0 {name=M5
 l=0.13u
 w=0.15u
 ng=1
@@ -158,7 +158,7 @@ model=sg13_lv_pmos
 spiceprefix=X
 }
 C {vdd.sym} 1310 -590 0 0 {name=l7 lab=VDD}
-C {/foss/designs/fd_pr/sg13_lv_nmos.sym} 1210 -110 0 0 {name=M6
+C {sg13g2_pr/sg13_lv_nmos.sym} 1210 -110 0 0 {name=M6
 l=0.13u
 w=0.15u
 ng=1
@@ -167,7 +167,7 @@ model=sg13_lv_nmos
 spiceprefix=X
 }
 C {gnd.sym} 1310 -90 0 0 {name=l9 lab=GND}
-C {/foss/designs/fd_pr/sg13_hv_nmos.sym} 820 -220 0 0 {name=M7
+C {sg13g2_pr/sg13_hv_nmos.sym} 820 -220 0 0 {name=M7
 l=1u
 w=2.3u
 ng=1
@@ -179,7 +179,7 @@ C {isource.sym} 840 -380 0 0 {name=I0 value=1u}
 C {vdd.sym} 840 -440 0 0 {name=l8 lab=VDD}
 C {gnd.sym} 840 -100 0 0 {name=l10 lab=GND}
 C {ngspice_probe.sym} 730 -280 0 0 {name=r1}
-C {/foss/designs/RAMP/OTA/POTA.sym} 800 150 3 0 {name=x1}
+C {OTA/POTA.sym} 800 150 3 0 {name=x1}
 C {vdd.sym} 550 -400 3 0 {name=l11 lab=VDD}
 C {gnd.sym} 770 -400 0 0 {name=l12 lab=GND}
 C {lab_pin.sym} 650 -560 1 0 {name=p1 sig_type=std_logic lab=X}
@@ -197,7 +197,7 @@ C {isource.sym} 1840 -150 0 0 {name=I1 value=1u}
 C {vdd.sym} 1840 -420 0 0 {name=l13 lab=VDD}
 C {gnd.sym} 1840 -100 0 0 {name=l14 lab=GND}
 C {ngspice_probe.sym} 1730 -250 0 0 {name=r3}
-C {/foss/designs/RAMP/OTA/NOTA.sym} 1610 -650 3 1 {name=x2}
+C {OTA/NOTA.sym} 1610 -650 3 1 {name=x2}
 C {vdd.sym} 1700 -370 1 0 {name=l15 lab=VDD}
 C {gnd.sym} 1510 -370 0 0 {name=l16 lab=GND}
 C {lab_pin.sym} 1610 -200 3 0 {name=p3 sig_type=std_logic lab=Y}
@@ -234,7 +234,7 @@ spice_ignore=false
 C {devices/launcher.sym} 540 -130 0 0 {name=h1
 descr="load op & annotate" 
 tclcommand="xschem raw_read $netlist_dir/Deadzone_try_1.raw; set show_hidden_texts 1; xschem annotate_op"}
-C {/foss/designs/fd_pr/sg13_lv_nmos.sym} -590 -40 0 0 {name=M9
+C {sg13g2_pr/sg13_lv_nmos.sym} -590 -40 0 0 {name=M9
 l=0.13u
 w=0.15u
 ng=1
@@ -242,7 +242,7 @@ m=1
 model=sg13_lv_nmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_lv_pmos.sym} -510 -290 0 0 {name=M10
+C {sg13g2_pr/sg13_lv_pmos.sym} -510 -290 0 0 {name=M10
 l=0.13u
 w=0.15u
 ng=1
@@ -250,7 +250,7 @@ m=3
 model=sg13_lv_pmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_lv_pmos.sym} -510 -460 0 0 {name=M11
+C {sg13g2_pr/sg13_lv_pmos.sym} -510 -460 0 0 {name=M11
 l=0.13u
 w=0.15u
 ng=1
@@ -262,7 +262,7 @@ C {vdd.sym} -490 -520 0 0 {name=l18 lab=VDD}
 C {gnd.sym} -490 -20 0 0 {name=l19 lab=GND}
 C {ngspice_probe.sym} -490 -200 0 0 {name=r10}
 C {gnd.sym} -590 -460 0 0 {name=l20 lab=GND}
-C {/foss/designs/fd_pr/sg13_lv_nmos.sym} -340 -170 0 0 {name=M12
+C {sg13g2_pr/sg13_lv_nmos.sym} -340 -170 0 0 {name=M12
 l=0.13u
 w=0.15u
 ng=1
@@ -270,7 +270,7 @@ m=1
 model=sg13_lv_nmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_lv_pmos.sym} -260 -420 0 0 {name=M13
+C {sg13g2_pr/sg13_lv_pmos.sym} -260 -420 0 0 {name=M13
 l=0.13u
 w=0.15u
 ng=1
@@ -279,7 +279,7 @@ model=sg13_lv_pmos
 spiceprefix=X
 }
 C {vdd.sym} -240 -520 0 0 {name=l21 lab=VDD}
-C {/foss/designs/fd_pr/sg13_lv_nmos.sym} -340 -40 0 0 {name=M14
+C {sg13g2_pr/sg13_lv_nmos.sym} -340 -40 0 0 {name=M14
 l=0.13u
 w=0.15u
 ng=1
@@ -518,7 +518,7 @@ C {code.sym} -170 -640 0 0 {name=SAVE_COMMANDS only_toplevel=false value="
 .save @n.xm19.nsg13_lv_pmos[vds]
 .save @n.xm19.nsg13_lv_pmos[vsat]
 "}
-C {/foss/designs/fd_pr/sg13_lv_pmos.sym} 350 -540 0 0 {name=M3
+C {sg13g2_pr/sg13_lv_pmos.sym} 350 -540 0 0 {name=M3
 l=0.13u
 w=0.15u
 ng=1
@@ -526,7 +526,7 @@ m=5
 model=sg13_lv_pmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_lv_nmos.sym} -1260 -20 0 0 {name=M15
+C {sg13g2_pr/sg13_lv_nmos.sym} -1260 -20 0 0 {name=M15
 l=0.13u
 w=0.15u
 ng=1
@@ -534,7 +534,7 @@ m=1
 model=sg13_lv_nmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_lv_pmos.sym} -1180 -270 0 0 {name=M16
+C {sg13g2_pr/sg13_lv_pmos.sym} -1180 -270 0 0 {name=M16
 l=0.13u
 w=0.15u
 ng=1
@@ -542,7 +542,7 @@ m=3
 model=sg13_lv_pmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_lv_pmos.sym} -1180 -440 0 0 {name=M17
+C {sg13g2_pr/sg13_lv_pmos.sym} -1180 -440 0 0 {name=M17
 l=0.13u
 w=0.15u
 ng=1
@@ -554,7 +554,7 @@ C {vdd.sym} -1160 -500 0 0 {name=l1 lab=VDD}
 C {gnd.sym} -1160 0 0 0 {name=l6 lab=GND}
 C {ngspice_probe.sym} -1160 -180 0 0 {name=r8}
 C {gnd.sym} -1260 -440 0 0 {name=l24 lab=GND}
-C {/foss/designs/fd_pr/sg13_lv_nmos.sym} -910 -150 0 0 {name=M18
+C {sg13g2_pr/sg13_lv_nmos.sym} -910 -150 0 0 {name=M18
 l=0.13u
 w=0.15u
 ng=1
@@ -562,7 +562,7 @@ m=1
 model=sg13_lv_nmos
 spiceprefix=X
 }
-C {/foss/designs/fd_pr/sg13_lv_pmos.sym} -830 -400 0 0 {name=M19
+C {sg13g2_pr/sg13_lv_pmos.sym} -830 -400 0 0 {name=M19
 l=0.13u
 w=0.15u
 ng=1
@@ -571,7 +571,7 @@ model=sg13_lv_pmos
 spiceprefix=X
 }
 C {vdd.sym} -810 -500 0 0 {name=l25 lab=VDD}
-C {/foss/designs/fd_pr/sg13_lv_nmos.sym} -910 -20 0 0 {name=M20
+C {sg13g2_pr/sg13_lv_nmos.sym} -910 -20 0 0 {name=M20
 l=0.13u
 w=0.15u
 ng=1

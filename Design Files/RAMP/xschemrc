@@ -1,0 +1,11 @@
+# Project xschemrc for the PVT-invariant ring amplifier (IHP SG13G2).
+# Start xschem from this directory (or pass --rcfile) so that the PDK
+# symbols and this project's sub-circuit symbols are both found.
+set env(PDK) ihp-sg13g2
+if {![info exists env(PDK_ROOT)] || $env(PDK_ROOT) eq {}} {
+  puts stderr {PDK_ROOT is not set: point it at the directory that contains ihp-sg13g2}
+}
+source $env(PDK_ROOT)/ihp-sg13g2/libs.tech/xschem/xschemrc
+# Sub-circuits are referenced relative to this directory (e.g. Fully-Diff-RAMP/STG2.sym)
+append XSCHEM_LIBRARY_PATH :[file dirname [file normalize [info script]]]
+set netlist_dir [file dirname [file normalize [info script]]]/simulations

@@ -94,7 +94,7 @@ N 1660 -400 1660 -375 {lab=#net9}
 N 1660 -375 1760 -375 {lab=#net9}
 N 1040 -325 1040 -305 {lab=#net8}
 N 960 -305 1040 -305 {lab=#net8}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/STG2.sym} 1540 -315 0 0 {name=x2}
+C {Fully-Diff-RAMP/STG2.sym} 1540 -315 0 0 {name=x2}
 C {iopin.sym} 140 -125 0 1 {name=p1 lab=GND}
 C {iopin.sym} 140 -485 0 1 {name=p2 lab=VDD}
 C {iopin.sym} 960 -205 0 1 {name=p3 lab=plus}
@@ -116,10 +116,10 @@ model=sg13_hv_pmos
 spiceprefix=X
 }
 C {iopin.sym} 70 -310 0 1 {name=p6 lab=VoutP}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/STG1-FD.sym} 900 -305 0 0 {name=x1}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/STG1-CM.sym} 600 -305 0 0 {name=x4}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/STG2_Replica.sym} 940 -310 0 0 {name=x5}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/STG2.sym} 965 -315 0 1 {name=x6}
+C {Fully-Diff-RAMP/STG1-FD.sym} 900 -305 0 0 {name=x1}
+C {Fully-Diff-RAMP/STG1-CM.sym} 600 -305 0 0 {name=x4}
+C {Fully-Diff-RAMP/STG2_Replica.sym} 940 -310 0 0 {name=x5}
+C {Fully-Diff-RAMP/STG2.sym} 965 -315 0 1 {name=x6}
 C {sg13g2_pr/sg13_hv_nmos.sym} 2195 -205 0 0 {name=M5
 l=1u
 w=2.3u

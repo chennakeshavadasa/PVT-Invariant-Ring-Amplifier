@@ -68,7 +68,7 @@ tran 1m 10m 1m
 .endc
 "}
 C {lab_pin.sym} 830 -320 0 1 {name=p1 sig_type=std_logic lab=Vout}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/RAMP-FD.sym} 200 -280 2 1 {name=x2}
+C {Fully-Diff-RAMP/RAMP-FD.sym} 200 -280 2 1 {name=x2}
 C {capa.sym} 830 -260 0 0 {name=C2
 m=1
 value=50p

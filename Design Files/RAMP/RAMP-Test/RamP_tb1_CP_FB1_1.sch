@@ -51,7 +51,7 @@ spice_ignore=false
 C {lab_pin.sym} 500 -250 0 0 {name=p2 sig_type=std_logic lab=VICM}
 C {ngspice_probe.sym} 860 -280 0 0 {name=r2}
 C {lab_pin.sym} 860 -280 0 1 {name=p1 sig_type=std_logic lab=Vout}
-C {/foss/designs/RAMP/Fully-Diff-RAMP/RAMP2.sym} 340 -280 0 0 {name=x1}
+C {Fully-Diff-RAMP/RAMP2.sym} 340 -280 0 0 {name=x1}
 C {code.sym} 290 -500 0 0 {name=SAVE_COMMANDS only_toplevel=false value="
 .save @n.x1.x2.xmn_stg2_3n1.nsg13_lv_nmos[gm]
 .save @n.x1.x2.xmn_stg2_3n1.nsg13_lv_nmos[gds]

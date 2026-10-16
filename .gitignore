@@ -1,0 +1,5 @@
+# xschem / ngspice outputs
+simulations/
+*.raw
+sim/build/
+__pycache__/
