@@ -565,8 +565,8 @@ largest available power saving; the signal-path inverters of stage 2 set the sec
 traded against them.
 
 <p align="center"><img src="docs/figures/results/fig_power.png" width="65%" alt="power breakdown"></p>
-<p align="center"><b>Fig. 23.</b> Supply current by block at TT, 27 °C, 1.65 V, amplifier at rest; the
-deadzone regulation loop is highlighted.</p>
+<p align="center"><b>Fig. 23.</b> Supply current by block at TT, 27 °C, 1.65 V, amplifier at rest
+(total in the centre).</p>
 
 ---
 

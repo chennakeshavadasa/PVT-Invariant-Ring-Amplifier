@@ -326,9 +326,11 @@ def fig_power():
               ("Deadzone regulation", ua("i(v.x1.v_x3)")),
               ("Bias mirrors + $I_{BIAS}$", ua("i(v.x1.v_xb)") + 1.0)]
     total = -1e6 * float(d["i(v2)"][0])
-    greys = ["#4d4d4d", "#6e6e6e", "#8f8f8f", "#b0b0b0", BLUE, "#d0d0d0"]
+    # one distinct hue per block, in an order that passes the colour-vision checks for
+    # neighbouring wedges (including last-to-first)
+    hues = [BLUE, ORANGE, "#1baf7a", "#eda100", "#6250d6", "#e87ba4"]
     fig, ax = plt.subplots(figsize=(COL1, 2.5))
-    wedges, _ = ax.pie([b[1] for b in blocks], colors=greys, startangle=90, counterclock=False,
+    wedges, _ = ax.pie([b[1] for b in blocks], colors=hues, startangle=90, counterclock=False,
                        wedgeprops=dict(width=0.36, edgecolor="white", linewidth=1.5))
     ax.text(0, 0.08, f"{total:.0f} µA", ha="center", va="center", fontsize=11)
     ax.text(0, -0.16, f"{total * 1.65:.0f} µW", ha="center", va="center")
