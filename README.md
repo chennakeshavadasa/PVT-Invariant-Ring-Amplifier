@@ -495,8 +495,8 @@ Figs. 15 and 18 (data: `sim/results/loop_{fix,reg}_<corner>_<T>.dat` and `sc_{fi
 125 °C, 1.65 V. Fixed bias: (a)–(c) magnitude, (d)–(f) phase; deadzone regulation: (g)–(i) magnitude, (j)–(l) phase.
 Markers: unity-gain frequency and the phase there; the ranges printed in each panel are over the five corners.</p>
 
-With fixed bias the dominant pole, set by $C_L$ and the output resistance of the weak-inversion output stage
-($\propto 1/I_Q$), moves by two decades between the SS and FF corners at −40 °C, and the unity-gain frequency moves with
+With fixed bias the dominant pole, set by $C_L$ and the output resistance of the weak-inversion output stage, which
+scales as $1/I_Q$, moves by two decades between the SS and FF corners at −40 °C, and the unity-gain frequency moves with
 it, from 0.56 to 36 MHz (Fig. 19(a), (d)). At 125 °C the fixed-bias corners are close together again (16–22 MHz), but
 every one of them then runs at 1.6 to 7 times the TT current (6.8–29 µA). With regulation the phase curves of the five
 corners lie on top of each other up to 1 MHz, and at each temperature the unity-gain frequencies stay within a factor
