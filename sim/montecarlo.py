@@ -28,7 +28,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ramp_pvt as rp  # noqa: E402
 
-N = int(sys.argv[1]) if len(sys.argv) > 1 else 500
+N = 500                                   # samples per set (command-line argument)
 N_WAVE = 100
 MC = rp.BUILD / "mc"
 MODELS = Path(os.environ["PDK_ROOT"]) / "ihp-sg13g2" / "libs.tech" / "ngspice" / "models"
@@ -98,6 +98,9 @@ def mp(lp):
 
 
 def main():
+    global N
+    if len(sys.argv) > 1:
+        N = int(sys.argv[1])
     MC.mkdir(parents=True, exist_ok=True)
     fixed = dict(l.split("=") for l in (rp.RESULTS / "fixed_bias.txt").read_text().split() if "_fixed=" in l)
     vcp, vcn = float(fixed["VCTRLP_fixed"]), float(fixed["VCTRLN_fixed"])

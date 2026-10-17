@@ -188,7 +188,8 @@ small-signal linear settling. Reproduced from [2, Fig. 2.12] (the thesis caption
 <p align="center"><b>Fig. 4.</b> The three phases in the layout-ready IHP design (TT, 27 °C, 200-mV buffer step,
 <i>C<sub>L</sub></i> = 50 pF), animated from the simulation. Left: output, stage-3 gate voltages and the currents
 of MP3 and of <i>C<sub>L</sub></i>, traced in time and shaded by phase. Right: the output stage at the same instant,
-with the device currents (shading ∝ log current) and the direction and size of the current into <i>C<sub>L</sub></i>.
+with the gate voltages <i>V<sub>GP</sub></i> and <i>V<sub>GN</sub></i>, the device currents (shading ∝ log current) and the
+direction and size of the current into <i>C<sub>L</sub></i>.
 The phase boundaries are detected from the data: a gate within 0.25 V of a rail (RC), |<i>I<sub>C<sub>L</sub></sub></i>| above
 20 <i>I<sub>Q</sub></i> (large signal), then until the output is within 0.1 % (small signal).</p>
 
