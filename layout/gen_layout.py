@@ -62,6 +62,11 @@ POWER = ("VDD", "GND")
 PORTS = D.CELLS[D.TOP]["ports"]
 LABELS = ("V1_CM", "VCTRLN", "VCTRLP", "Vo_STG1", "mn_dz", "mp_dz", "icm", "inota", "ipota", "irn", "irp", "it1")
 PORT_EDGE = dict(IBIAS="bottom", minus="bottom", plus="bottom", Vout="top")
+# optional extra spacing for high-impedance nets: a track of their own with an empty track
+# on either side and twice the column spacing.  {"Vo_STG1", "mp_dz", "mn_dz"} cuts their
+# routing capacitance by 25-45 % and gains about 5 deg of post-layout phase margin, for 17 %
+# more area (README Section VI-D); off in the compact layout.
+CRIT = set()
 PLACEMENT = {"strips": {}, "bands": [], "channels": [], "mims": [], "columns": {}}
 
 
@@ -306,17 +311,40 @@ def assign_tracks(pins, cols):
             if a["net"] != b["net"] and abs(a["x"] - b["x"]) < 0.5:
                 pred[b["net"]].add(a["net"])
     track, todo, t = {}, set(iv), 0
+    exclusive = set()
     while todo:
         ready = sorted((n for n in todo if pred[n] <= set(track)), key=lambda n: iv[n][0])
         if not ready:
             raise RuntimeError(f"cyclic vertical constraints: {sorted(todo)}")
-        end = -1e9
+        end, excl = -1e9, False
         for n in ready:
+            if n in CRIT:
+                if end == -1e9:          # alone on this track
+                    track[n] = t
+                    excl = True
+                    break
+                continue
             if iv[n][0] > end + 0.55:
                 track[n] = t
                 end = iv[n][1]
+        if excl:
+            exclusive.add(t)
         todo -= {n for n in track}
         t += 1
+    # spread: an empty track on either side of every exclusive track
+    newidx, k, prev_spacer = {}, 0, False
+    for tt in range(t):
+        if tt in exclusive:
+            if not prev_spacer:
+                k += 1
+            newidx[tt] = k
+            k += 2
+            prev_spacer = True
+        else:
+            newidx[tt] = k
+            k += 1
+            prev_spacer = False
+    track = {n: newidx[v] for n, v in track.items()}
     return track, iv
 
 
@@ -389,7 +417,7 @@ def main():
     occupied = []        # (x, lo, hi)
     for n in POWER:
         cols[n] = [(XL_COL[n], 0, nch - 1), (XR_COL[n], 0, nch - 1)]
-        occupied += [(XL_COL[n], -1, nch), (XR_COL[n], -1, nch)]
+        occupied += [(XL_COL[n], -1, nch, n), (XR_COL[n], -1, nch, n)]
     need = [n for n in where if n not in POWER and (len(where[n]) > 1 or n in PORTS)]
     need.sort(key=lambda n: -(max(where[n]) - min(where[n])))
     for n in need:
@@ -405,13 +433,14 @@ def main():
             for xc in (g(target + k * 0.05), g(target - k * 0.05)):
                 if not (x_left - 0.3 < xc < width - x_left + 0.3):
                     continue
-                if all(abs(xc - ox) >= COL or ohi < lo or olo > hi for ox, olo, ohi in occupied):
+                if all(abs(xc - ox) >= (2 * COL if (n in CRIT or on in CRIT) else COL) or ohi < lo or olo > hi
+                       for ox, olo, ohi, on in occupied):
                     best = xc
                     break
             if best is not None:
                 break
         cols[n] = [(best, lo, hi)]
-        occupied.append((best, lo, hi))
+        occupied.append((best, lo, hi, n))
 
     # 3) tracks per channel
     tracks, ivs, ntr = [], [], []

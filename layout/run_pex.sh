@@ -29,7 +29,7 @@ EOF
 python3 - "$RUN/RAMP_LR_lvs.spice" "$OUT/RAMP_LR_pex.spice" <<'PYEOF'
 import re, sys
 for f in sys.argv[1:]:
-    s = open(f).read().replace("$", "_")
+    s = open(f).read().replace("$", "_").replace("\n+", " ")      # join continuation lines
     cells = [c for c in re.findall(r"^\.subckt (\S+)", s, re.M) if c != "RAMP_LR"]
     for c in cells:
         s = re.sub(rf"^(\.subckt ){re.escape(c)} ", rf"\1pc_{c} ", s, flags=re.M)

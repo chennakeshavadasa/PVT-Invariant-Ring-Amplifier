@@ -6,7 +6,7 @@ the devices as drawn plus 0.01 fF and larger area, fringe and coupling capacitan
 every net (no wire resistance).  For simulation it is turned into a library sub-circuit
 RAMP_LR_PEX with
   * the same port order as the schematic RAMP_LR,
-  * the same 0-V ammeter VIQ in the source connection of the output PMOS, and
+  * the same 0-V ammeter VIQ in the source connection of the output-PMOS fingers, and
   * a 1-TOhm resistor to ground on the nodes that only touch capacitors (e.g. the bodies
     of the rhigh resistors), which would otherwise leave the DC matrix singular.
 Both views then run the testbenches of sim/ramp_pvt.py (operating point, loop gain, supply
@@ -40,45 +40,52 @@ def pex_library() -> Path:
     assert sorted(p.lower() for p in top_ports) == sorted(p.lower() for p in PORTS), top_ports
     # ports of every cell that reach a device terminal (the rest only carry capacitance)
     dc_ports = {}
-    devices = {}
     for name, (ports, cbody) in cells.items():
-        devs = [l.split() for l in cbody.splitlines() if l.startswith("X")]
-        terms = {t for d in devs for t in d[1:-1] if "=" not in t}
+        terms = {t for l in cbody.splitlines() if l.startswith("X") for t in l.split()[1:5]}
         dc_ports[name] = [p in terms for p in ports]
-        devices[name] = devs
-    lines, nets_dc, nets_all, n_iq = [], set(PORTS), set(), 0
+    lines, nets_dc, nets_all, n_iq, probed = [], set(PORTS), set(), 0, {}
     for line in body.splitlines():
         tok = line.split()
         if line.startswith("X") and tok[-1] in cells:
             cell, conn = tok[-1], tok[1:-1]
-            ports = cells[cell][0]
+            ports, cbody = cells[cell]
             nets_all.update(conn)
             nets_dc.update(c for c, ok in zip(conn, dc_ports[cell]) if ok)
             pmap = dict(zip(ports, conn))
-            for d in devices[cell]:
-                dr, g, s, model = pmap.get(d[1]), pmap.get(d[2]), pmap.get(d[3]), d[5]
-                # output PMOS (MP3): gate mp_dz, drain or source on Vout, the other on VDD
-                if model == "sg13_hv_pmos" and g == "mp_dz" and {dr, s} == {"Vout", "VDD"}:
-                    vdd_port = d[1] if dr == "VDD" else d[3]
-                    conn = [("vdd_q" if (p == vdd_port and c == "VDD") else c) for p, c in zip(ports, conn)]
-                    line = " ".join([tok[0]] + conn + [cell])
+            # output PMOS (MP3) fingers: gate mp_dz, drain or source on Vout, the other on VDD.
+            # Their VDD terminal moves to a new cell port "iq_s" that the ammeter VIQ feeds;
+            # dummies and the replica in the same diffusion strip stay on VDD.
+            new, hit = [], False
+            for l in cbody.splitlines():
+                t = l.split()
+                if l.startswith("X") and len(t) > 5 and t[5] == "sg13_hv_pmos" and pmap.get(t[2]) == "mp_dz" \
+                        and {pmap.get(t[1]), pmap.get(t[3])} == {"Vout", "VDD"}:
+                    k = 1 if pmap.get(t[1]) == "VDD" else 3
+                    t[k] = "iq_s"
+                    l = " ".join(t)
+                    hit = True
                     n_iq += 1
+                new.append(l)
+            if hit:
+                cname = cell + "_iq"
+                probed[cname] = (ports + ["iq_s"], "\n".join(new) + "\n")
+                line = " ".join([tok[0]] + conn + ["vdd_q", cname])
         elif line.startswith("C"):
             nets_all.update(tok[1:3])
         lines.append(line)
-    assert n_iq, "output PMOS not found in the extracted netlist"
+    assert n_iq == 4, f"expected 4 output-PMOS fingers, found {n_iq}"
+    cells.update(probed)
     floating = sorted(n for n in nets_all - nets_dc if n not in ("0", "GND"))
     lines.append("VIQ VDD vdd_q 0")
     lines += [f"RFLOAT{i} {n} GND 1T" for i, n in enumerate(floating)]
     sub = "\n".join(f".subckt {n} {' '.join(p)}\n{b}.ends\n" for n, (p, b) in cells.items())
     lib = (f"* RAMP_LR post-layout (magic PEX of layout/RAMP_LR.gds), built by sim/postlayout.py\n"
-           f"* {n_iq} output-PMOS units on VIQ, {len(floating)} capacitor-only nodes tied to GND by 1 TOhm\n"
+           f"* {n_iq} output-PMOS fingers on VIQ, {len(floating)} capacitor-only nodes tied to GND by 1 TOhm\n"
            f"{sub}\n.subckt RAMP_LR_PEX {' '.join(PORTS)}\n" + "\n".join(lines) + "\n.ends\n")
     f = OUT / "pex_lib.spice"
     f.write_text(lib)
-    print(f"post-layout library: {len(cells)} cells, {n_iq} output-PMOS units, {len(floating)} floating nodes")
+    print(f"post-layout library: {len(cells)} cells, {n_iq} output-PMOS fingers on VIQ, {len(floating)} floating nodes")
     return f
-
 
 SENS = {"all parasitics removed": None, "Vo_STG1 (stage-1 output)": {"Vo_STG1"},
         "mp_dz, mn_dz (stage-2 outputs)": {"mp_dz", "mn_dz"}, "V1_CM (trip-point replica)": {"V1_CM"},

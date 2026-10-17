@@ -549,7 +549,7 @@ def fig_mc_perf():
     spec = (("ugf_hz", 1e-6, "Unity-gain freq. (MHz)", np.logspace(-3, 2.5, 40), True),
             ("pm_deg", 1.0, "Phase margin (deg)", np.linspace(0, 95, 39), False),
             ("offset_mv", 1.0, "Buffer offset (mV)", np.linspace(-60, 60, 41), False),
-            ("sc_err250_Sr_pct", 1.0, "4-mV step error at 250 ns (%)", np.logspace(-2.5, 2.5, 41), True))
+            ("sc_err250_Sr_pct", 1.0, "Error at 250 ns (%)", np.logspace(-2.5, 2.5, 41), True))
     for ax, (key, sc, lab, bins, logx) in zip(axs, spec):
         for bias in ("fix", "reg"):
             col, mk, blab = BIAS[bias]
@@ -589,13 +589,15 @@ def fig_mc_waves():
         axs[r, 0].set(ylim=(-40, 110), ylabel="$|T|$ (dB)")
         axs[r, 0].axhline(0, color=GREY, lw=0.6, ls=":")
         axs[r, 1].set(ylim=(-0.1, 1.3), ylabel="Normalised $V_{out}$")
-        axs[r, 0].text(0.97, 0.95, BIAS_ROW[bias], transform=axs[r, 0].transAxes, ha="right", va="top")
+        axs[r, 0].text(0.97, 0.95, BIAS_ROW[bias], transform=axs[r, 0].transAxes, ha="right", va="top",
+                       bbox=dict(fc="white", ec="none", pad=1.0))
     axs[1, 0].set(xlabel="Frequency (Hz)", xlim=(10, 1e9))
     axs[1, 1].set(xlabel="Time after the 4-mV step (ns)", xlim=(-20, 1000))
     axs[0, 0].legend(loc="lower left")
     for ax, sl in zip(axs.flat, "abcd"):
-        ax.text(0.03, 0.05 if ax in axs[:, 0] else 0.95, f"({sl})", transform=ax.transAxes, ha="left",
-                va="bottom" if ax in axs[:, 0] else "top")
+        left = ax in axs[:, 0]
+        ax.text(0.03 if left else 0.97, 0.95, f"({sl})", transform=ax.transAxes, ha="left" if left else "right",
+                va="top", bbox=dict(fc="white", ec="none", pad=1.0))
     fig.tight_layout(h_pad=0.4, w_pad=1.0)
     save(fig, "fig_mc_waves.png")
 

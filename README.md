@@ -24,6 +24,7 @@ Nithin Purushothama &nbsp;·&nbsp; <a href="https://github.com/chennakeshavadasa
 - [IV. Circuit Implementation in IHP SG13G2](#iv-circuit-implementation-in-ihp-sg13g2)
 - [V. Simulation Results](#v-simulation-results)
   - [E. Cross-corner waveforms (Bode, three-phase settling, step responses)](#e-cross-corner-waveforms)
+  - [F. Monte Carlo: process variation and mismatch](#f-monte-carlo-process-variation-and-mismatch)
 - [VI. Layout](#vi-layout)
   - [D. Post-layout simulation](#d-post-layout-simulation)
 - [VII. Comparison with Prior Art](#vii-comparison-with-prior-art)
@@ -52,17 +53,20 @@ from PDK devices and one external 1-µA reference (77.3 dB, 18.8 MHz, 61.6°) st
 five process corners, −40 °C to 125 °C and $V_{DD}$ ± 5 % holds $I_Q$ within 3.99–5.82 µA, whereas the same amplifier
 with the deadzone frozen at its typical value spans 0.003–32.7 µA; the unity-gain-frequency spread shrinks from 860× to
 6×, and the small-signal settling error of an SC amplifier 250 ns after a step falls from up to 82 % to at most 1.6 %
-(≤ 0.25 % everywhere except at 125 °C in the fast-NMOS corners). A matched layout (common-centroid input pairs and
-mirrors, replica devices centred in the output-stage arrays, dummies, continuous ties) of 109 µm × 183 µm is clean in
-the IHP DRC and antenna decks and matches the schematic in LVS. Post-layout simulation with the extracted
-capacitances shows, however, that this layout costs most of the phase margin (61.6° → 34.2° at TT, 27 °C; the
-buffer oscillates at SS, −40 °C); a per-net analysis traces the loss to 44 fF on the high-impedance stage-1 output and
-to the stage-2 outputs, which a second layout iteration has to shorten. The remaining weaknesses — a 33-dB supply rejection
+(≤ 0.25 % everywhere except at 125 °C in the fast-NMOS corners). A compact matched layout of 83 µm × 44 µm
+(0.0037 mm²; multi-finger devices with shared diffusions, ABBA pairs, interdigitated mirrors, the 2-pF capacitors over
+the circuit) is clean in the IHP DRC and antenna decks and matches the schematic in LVS. Post-layout simulation with the
+extracted capacitances still costs phase margin (61.6° → 44.4° at TT, 27 °C; the buffer oscillates at SS, −40 °C),
+mainly through the 19 fF of routing on the high-impedance stage-1 output. A Monte Carlo analysis with the PDK's
+statistical models shows that the regulation removes global process variation ($I_Q$ = 4.18–4.26 µA, 5th–95th
+percentile, against 0.6–10 µA with fixed bias) but not local mismatch: with the minimum-size stage-2 inverters of the
+original design, $I_Q$ spreads over more than five decades with or without the loop. The remaining weaknesses — a 33-dB supply rejection
 and a 1.5 % common-mode-dependent gain error caused by the transistor-level CMFB, and the residual temperature
 dependence of the transconductance at constant $I_Q$ — are quantified and traced to their causes.
 
 **Index Terms** — Ring amplifier, deadzone, PVT variation, replica biasing, switched-capacitor amplifier,
-common-mode feedback, loop-gain analysis, layout matching, common centroid, DRC, LVS, IHP SG13G2, open-source PDK.
+common-mode feedback, loop-gain analysis, layout matching, common centroid, DRC, LVS, parasitic extraction,
+post-layout simulation, Monte Carlo, IHP SG13G2, open-source PDK.
 
 ---
 
@@ -75,7 +79,8 @@ export PDK_ROOT=<directory that contains ihp-sg13g2>
 python3 layout/gen_schematics.py        # RAMP_LR xschem cells
 python3 sim/ramp_pvt.py                 # PVT simulations, 3.5 min*
 python3 sim/internal_loops.py           # Table II
-python3 sim/cmfb_experiment.py          # Table VI
+python3 sim/cmfb_experiment.py          # Table VII
+python3 sim/montecarlo.py               # Monte Carlo, 3 sets x 2 biases x 500 samples, 35 min*
 PYTHON=<python with klayout module> layout/run_checks.sh   # layout, DRC, LVS
 layout/run_pex.sh                       # parasitic extraction (magic) + netgen LVS
 python3 sim/postlayout.py               # schematic vs. post-layout, 4 min*
@@ -343,11 +348,15 @@ work (Table III). It is described once, in `layout/ramp_lr_design.py`, from whic
 file. Fig. 12 shows the resulting architecture.
 
 <p align="center"><img src="docs/figures/diagrams/fig_architecture.png" width="100%" alt="architecture of RAMP_LR"></p>
-<p align="center"><b>Fig. 12.</b> Architecture of the layout-ready ring amplifier RAMP_LR. Signal path
-(top): stage 1 with transistor CMFB referenced to <i>V<sub>1,CM</sub></i>, current-starved stage 2, output stage MP3/MN3.
-Deadzone regulation loop (bottom right): stage-2 replica, error amplifiers NOTA/POTA, reference diodes MP_R/MN_R and
-2-pF MIM decoupling of <i>V<sub>CTRLN</sub></i>/<i>V<sub>CTRLP</sub></i>. Bias (bottom left): one external
-<i>I<sub>BIAS</sub></i> = 1 µA mirrored to all branches.</p>
+<p align="center"><b>Fig. 12.</b> Architecture of the layout-ready ring amplifier RAMP_LR. (a) Signal path:
+stage 1 with transistor CMFB referenced to <i>V<sub>1,CM</sub></i>; stage 2 as two current-starved inverters whose
+deadzone devices M<sub>DZN</sub> (MN_DZ_STG2_3P) and M<sub>DZP</sub> (MP_DZ_STG2_3N, ×5) are controlled by
+<i>V<sub>CTRLN</sub></i> and <i>V<sub>CTRLP</sub></i>; output stage MP3/MN3 driving <i>C<sub>L</sub></i> = 50 pF.
+(b) Deadzone regulation: the trip-point replica sets <i>V<sub>1,CM</sub></i>; replicas of the two stage-2 inverters
+driven by <i>V<sub>1,CM</sub></i> give <i>V′<sub>GP</sub></i> and <i>V′<sub>GN</sub></i>, which NOTA and POTA compare
+with the gate voltages of the reference diodes MP_R and MN_R at 1 µA. MP3 and MN3 are four times MP_R and MN_R, so
+<i>I<sub>Q</sub></i> = 4 <i>I<sub>BIAS</sub></i>; 2-pF MIM capacitors decouple the control voltages. All bias currents
+are mirrored from one external <i>I<sub>BIAS</sub></i> = 1 µA (not shown).</p>
 
 <p align="center">TABLE III<br>CHANGES FROM THE ORIGINAL SCHEMATIC TO RAMP_LR</p>
 
@@ -355,18 +364,18 @@ Deadzone regulation loop (bottom right): stage-2 replica, error amplifiers NOTA/
 |:--|:--|:--|
 | ideal current sources (10 µA, 2 × 2 µA, 2 × 1 µA) | one external $I_{BIAS}$ = 1 µA, NMOS/PMOS mirrors of 0.5/8-µm units | buildable; with 2-µm-long units the 1-µA branches were 24–28 % off (DIBL in weak inversion), with 8 µm ≤ 4 % ($I_Q$ = 4.22 µA vs 4.10 µA) |
 | ideal CMFB amplifier E1 (gain 10⁴, no pole) | NMOS pair MC1/MC2 with diode loads MPC1/MPC2 mirrored 1:1 into the loads; loads m = 2 instead of 1 | stable (Table II); the loads needed more width for headroom |
-| ideal 100-kΩ resistors | rhigh poly, 0.5 × 33.7 µm (4 series segments in layout) | buildable |
+| ideal 100-kΩ resistors | rhigh poly, 0.5 × 33.7 µm (10 series segments of 3.37 µm in layout) | buildable |
 | — | 2-pF MIM capacitors on $V_{CTRLP}$ (to $V_{DD}$) and $V_{CTRLN}$ (to GND) | dominant pole of the regulation loops: PM −27°/11° → 83°/88° |
 | — | MOS gate capacitors MCN/MCP on $V_{CTRLN}/V_{CTRLP}$ | antenna rule: MIM plate area / gate area of the 0.15 × 0.13-µm gates was ≈ 35 000 (limit 20 000) |
 | body of MP_STG2_3P2 (×2) and M12 tied to their sources | body to GND | a standard SG13G2 NMOS sits in the common p-substrate |
 | input pair W = 1.563 µm | 1.56 µm | 5-nm manufacturing grid |
-| — | 29 dummy transistors in `DUMMY_LR` | matching; excluded from LVS with `lvs_ignore` because the IHP deck purges shorted devices on the layout side |
+| — | 33 dummy fingers in `DUMMY_LR` | matching; excluded from LVS with `lvs_ignore` because the IHP deck purges shorted devices on the layout side |
 
 The single-stage transistor CMFB is the one compromise of the redesign. With the main loop closed, the stage-1 output
 $V_{o1}$ is held by the feedback, so the other drain sees the 200-kΩ sensing path to a fixed node and the common-mode
 "plant" has only about 35 dB of gain; the ideal E1 contributed the missing 80 dB. Cascoding the loads does not help (the
 limit is the sensing path, not the load resistance), and a two-stage CMFB amplifier needs about 20 pF of compensation to
-be stable; both were tried and are not used. The consequences are quantified in Section V-G.
+be stable; both were tried and are not used. The consequences are quantified in Section V-H.
 
 ---
 
@@ -377,7 +386,7 @@ All results below are for RAMP_LR unless stated otherwise, at $V_{DD}$ = 1.65 V,
 the loop produces at TT, 27 °C (0.831 V / 0.822 V) — the experiment of [2, Table 3.1]. The MOS corners are those of the
 IHP models (TT, SS, FF, SF, FS); resistors and capacitors use their typical/worst/best sections with the matching MOS
 corner. Data: `sim/results/pvt_summary.csv` (109 rows). Section V-E shows the Bode plots and step responses
-of all five corners at each temperature (Figs. 19–21).
+of all five corners at each temperature (Figs. 19–21), Section V-F the Monte Carlo analysis.
 
 ### A. Loop gain
 
@@ -420,7 +429,7 @@ there (Section II-C), and its phase margin is the lowest — the trade-off descr
 <p align="center"><img src="docs/figures/results/fig_pvt_ugf_pm.png" width="100%" alt="UGF and PM over PVT"></p>
 <p align="center"><b>Fig. 15.</b> (a) Unity-gain frequency and (b) phase margin over process corner and
 temperature; markers at 1.65 V, bars over 1.5675–1.7325 V. Orange: fixed bias; blue: deadzone regulation; grey
-triangles: regulation with an ideal PTAT reference current (Section V-F). The fixed-bias SS and SF bars at −40 °C
+triangles: regulation with an ideal PTAT reference current (Section V-G). The fixed-bias SS and SF bars at −40 °C
 continue below 0.1 MHz at the low supply.</p>
 
 Over all 45 PVT points the UGF spans 0.04–35.9 MHz with fixed bias (860×) and 5.4–32.4 MHz with regulation (6×). The
@@ -536,7 +545,59 @@ stage-3 gate voltages and load current <i>C<sub>L</sub></i>·d<i>V<sub>out</sub>
 buffer step at every corner and temperature, 1.65 V: (a) fixed bias, (b) deadzone regulation. Numbers: time to 0.1 %
 in ns.</p>
 
-### F. Temperature: constant current is not constant transconductance
+### F. Monte Carlo: process variation and mismatch
+
+The IHP models come with statistical sections: `*_stat` varies the model parameters of all devices of a type together
+(global, die-to-die variation), `*_mismatch` gives every device its own threshold, mobility, width and length offset,
+scaled with $1/\sqrt{WL}$ (local variation) [23]. For the 0.15/0.13-µm stage-2 devices σ($V_{th}$) is 28 mV (NMOS) and
+16 mV (PMOS), for one finger of the stage-1 input pair 3.1 mV. `sim/montecarlo.py` runs 500 samples for each of three
+sets — global, local, and both (the `_stat` parameters with the mismatch model files) — for the regulated and the
+fixed-bias amplifier at TT, 27 °C, 1.65 V. Every sample is a separate ngspice process with its own seed, so the run is
+reproducible. Table VI summarises the results.
+
+<p align="center">TABLE VI<br>MONTE CARLO, 500 SAMPLES PER ROW (TT, 27 °C, 1.65 V; <code>sim/results/mc_summary.csv</code>)</p>
+
+| Variation | Bias | $I_Q$, 5th–95th percentile (µA) | $I_Q$ within ± 25 % of 4.2 µA | UGF median (5th pct.) (MHz) | UGF below 1 MHz | PM, 5th pct. | σ(offset) | 4-mV SC error at 250 ns > 0.1 % |
+|:--|:--|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| global | **regulated** | **4.18 – 4.26** | **100 %** | 18.6 (16.8) | 0 % | 57° | 1.0 mV | **0 %** |
+| global | fixed | 0.61 – 10.3 | 23 % | 18.5 (4.4) | 1 % | 49° | 2.3 mV | 13 % |
+| local | **regulated** | **0.0003 – 153** | **5 %** | 19.0 (0.001) | 30 % | 17° | 8.0 mV | **46 %** |
+| local | fixed | 0.007 – 100 | 6 % | 17.6 (0.04) | 21 % | 18° | 7.9 mV | 40 % |
+| both | regulated | 0.0004 – 155 | 3 % | 14.2 (0.001) | 30 % | 18° | 9.0 mV | 49 % |
+| both | fixed | 0.003 – 93 | 4 % | 19.2 (0.01) | 22 % | 19° | 8.9 mV | 42 % |
+
+<p align="center"><img src="docs/figures/results/fig_mc_iq.png" width="100%" alt="Monte Carlo distribution of I_Q"></p>
+<p align="center"><b>Fig. 24.</b> Monte Carlo distribution of the output-stage quiescent current, fixed bias and
+deadzone regulation, 500 samples each: (a) global process variation, (b) local mismatch, (c) both. Dotted: nominal
+4.2 µA; values below 10<sup>−4</sup> µA are counted in the first bin.</p>
+
+Global variation is what the regulation was designed for, and it removes it: $I_Q$ stays within 4.18–4.26 µA
+(σ = 0.6 %) and every sample settles to 0.1 % within 250 ns, while with fixed bias $I_Q$ spreads over 0.6–10 µA and 13 %
+of the samples miss 0.1 % (Fig. 24(a)). Local mismatch is a different matter (Fig. 24(b), (c)). The deadzone is
+the difference between the trip points of the two stage-2 inverters, and with minimum-size devices each trip point moves
+by tens of millivolts from device to device. The loop regulates the replica, not the signal path: mismatch between the
+replica and the signal-path inverters, between MP_R/MN_R and MP3/MN3, and the offsets of NOTA and POTA all pass
+straight into the deadzone of the signal path. $I_Q$, which depends exponentially on it in weak inversion, then spreads
+over more than five decades whether or not the loop is closed; 30 % of the regulated samples have a unity-gain
+frequency below 1 MHz (the output stage is practically off), others draw more than 100 µA, and almost half miss 0.1 %
+after 250 ns (Figs. 25 and 26). The buffer offset, σ = 8–9 mV, has the same origin.
+
+<p align="center"><img src="docs/figures/results/fig_mc_perf.png" width="100%" alt="Monte Carlo distributions of UGF, PM, offset and settling"></p>
+<p align="center"><b>Fig. 25.</b> Global + local Monte Carlo, 500 samples each: (a) unity-gain frequency,
+(b) phase margin and (c) offset of the unity-gain buffer, (d) error of the SC amplifier 250 ns after a 4-mV step
+(dotted: 0.1 %). Values outside the axis range are counted in the end bins.</p>
+
+<p align="center"><img src="docs/figures/results/fig_mc_waves.png" width="100%" alt="Monte Carlo loop gain and step responses"></p>
+<p align="center"><b>Fig. 26.</b> Loop gain and SC response to a 4-mV step of the first 100 global + local
+samples: (a), (b) fixed bias; (c), (d) deadzone regulation. Black: nominal loop gain.</p>
+
+The regulation is therefore no substitute for matching. The devices that define the deadzone — stage 2, its replica,
+the reference diodes and the error-amplifier input pairs — have to be sized for mismatch (σ($V_{th}$) ∝ $1/\sqrt{WL}$),
+which the minimum sizes taken over from the 65-nm design [2] are not. Larger stage-2 devices also load the stage-1
+output, the node that limits the post-layout phase margin (Section VI-D), so this is a design trade-off and not only a
+layout task.
+
+### G. Temperature: constant current is not constant transconductance
 
 Regulating $I_Q$ to a constant current fixes the process dependence but not the temperature dependence of $g_{m3}$; [2]
 notes that a constant-gm reference would be the natural $I_{BIAS}$. As a first test, $I_{BIAS}$ was made ideally
@@ -545,12 +606,12 @@ the UGF at TT from 3.5× to 2.2× and the total spread from 6× to 4.3× (grey t
 remain the slowest because $A_1A_2$ also falls with temperature, and the small-step error at 125 °C is not
 reduced (up to 1.2 %, Table V). A complete solution must compensate the first two stages as well.
 
-### G. Supply rejection, common-mode error and headroom
+### H. Supply rejection, common-mode error and headroom
 
-Table VI lists the figures that the layout-ready redesign made worse; all three follow from the 35-dB transistor CMFB
+Table VII lists the figures that the layout-ready redesign made worse; all three follow from the 35-dB transistor CMFB
 (Section IV-D) and the 1.2-V source-gate drop of the hv PMOS loads of stage 1.
 
-<p align="center">TABLE VI<br>FIGURES DEGRADED BY THE TRANSISTOR-LEVEL CMFB (TT, 27 °C, 1.65 V UNLESS NOTED; <code>sim/cmfb_experiment.py</code>)</p>
+<p align="center">TABLE VII<br>FIGURES DEGRADED BY THE TRANSISTOR-LEVEL CMFB (TT, 27 °C, 1.65 V UNLESS NOTED; <code>sim/cmfb_experiment.py</code>)</p>
 
 | Quantity | Original (ideal E1) | RAMP_LR | Same, ideal CMFB in RAMP_LR |
 |:--|:--:|:--:|:--:|
@@ -564,15 +625,15 @@ In the buffer the input common mode moves with the signal; the CMFB lets the sec
 100-kΩ loads), appears as input-referred error. A supply change shifts the common mode in the same way. In the SC test
 the inputs stay at the virtual ground and the effect disappears from the settling results above, but the supply
 rejection applies to every configuration. At 125 °C and low supply the CMFB also runs out of headroom and the buffer
-gains only 0.67–0.92 across the corners. Fig. 24 shows the PSRR versus frequency.
+gains only 0.67–0.92 across the corners. Fig. 27 shows the PSRR versus frequency.
 
 <p align="center"><img src="docs/figures/results/fig_psrr.png" width="55%" alt="PSRR"></p>
-<p align="center"><b>Fig. 24.</b> Power-supply rejection of the closed-loop buffer (RAMP_LR, regulated,
+<p align="center"><b>Fig. 27.</b> Power-supply rejection of the closed-loop buffer (RAMP_LR, regulated,
 27 °C) for the five corners.</p>
 
-### H. Power
+### I. Power
 
-The amplifier draws 156 µA (257 µW) at TT, 27 °C (Fig. 25). The output stage itself takes only 4.2 µA; most of the
+The amplifier draws 156 µA (257 µW) at TT, 27 °C (Fig. 28). The output stage itself takes only 4.2 µA; most of the
 current flows through the minimum-size inverters biased at their switching point — stage 2 (38 µA), its replica in the
 regulation loop (≈ 38 µA of the 41 µA of that block) and the trip-point replica that generates $V_{1,CM}$ (47 µA). The
 regulation loop as a whole costs 27 % of the supply current. Scaling the replica inverters down (longer channels) is the
@@ -580,7 +641,7 @@ largest available power saving; the signal-path inverters of stage 2 set the sec
 traded against them.
 
 <p align="center"><img src="docs/figures/results/fig_power.png" width="65%" alt="power breakdown"></p>
-<p align="center"><b>Fig. 25.</b> Supply current by block at TT, 27 °C, 1.65 V, amplifier at rest
+<p align="center"><b>Fig. 28.</b> Supply current by block at TT, 27 °C, 1.65 V, amplifier at rest
 (total in the centre).</p>
 
 ---
@@ -589,51 +650,65 @@ traded against them.
 
 ### A. Floor plan and routing
 
-The layout (`layout/RAMP_LR.gds`, Fig. 26) is generated by `layout/gen_layout.py` in KLayout from the IHP PCells
-[17], [20]. Every transistor is placed as unit devices with one finger (a device with multiplier *m* becomes *m* units)
-in rows of identical W/L and orientation. The rows form two columns with a Metal3 routing spine between them; each
-horizontal band holds one left and one right row, which share a gate channel below and a source/drain channel above.
-Gates are contacted below each unit and sources/drains above it on Metal1 stubs; each channel holds one horizontal
-Metal2 track per net, and nets that appear in more than one channel get a vertical Metal3 column in the spine (27
-columns). The two 2-pF MIM capacitors sit on Metal5/TopMetal1 above the spine, where they take no extra area. The block
-measures 109 µm × 183 µm (0.020 mm²).
+The layout (`layout/RAMP_LR.gds`, Fig. 29) is generated by `layout/gen_layout.py` in KLayout from the IHP PCells
+[17], [20]; the placement is described in `layout/ramp_lr_design.py` (`STRIPS`, `BANDS`). It measures
+83.1 µm × 44.0 µm (0.0037 mm²). The circuit is built from 15 *strips*, rows of transistor fingers of one kind and W/L.
+Each strip consists of multi-finger PCells whose fingers share their source and drain diffusions; which diffusion
+carries which net is solved from the device pins, so a strip only lists its fingers (A B B A for a differential pair).
+Diffusion breaks separate groups that cannot share a diffusion, dummy fingers close every group, and a substrate or
+well tie closes each strip end: 140 fingers, 33 of them dummies, in 43 PCells.
+
+The rows follow the signal and the supply. At the bottom are four rows of the NMOS bias mirror, whose 0.5/8-µm units
+take most of the active area; above them the PMOS bias mirror and the POTA load; then the NMOS signal row (NOTA input
+pair, rhigh sensing resistors, stage-1 and CMFB pairs, stage-2 NMOS, output NMOS) and the PMOS signal row (POTA input
+pair, NOTA load, stage-1 loads, stage-2 PMOS, output PMOS), aligned so that every stage sits over its NMOS half and
+the path from stage 1 to stage 3 runs left to right. Neighbouring rows are mirrored so that they share a routing
+channel: the gate contacts of a row face one channel and its source/drain contacts the other. In each channel a
+constrained left-edge router assigns horizontal Metal2 tracks — nets share a track where their spans do not overlap,
+and a pin coming from above never crosses one coming from below — and Metal1 stubs connect the contacts. Only nets
+that change channel get a vertical Metal3 column, placed next to their pins: 42 tracks in eight channels and 24
+columns. VDD and GND run on Metal3 columns at both block edges and on full-width Metal2 tracks. The two 2-pF MIM
+capacitors (Metal5/TopMetal1) cover the circuit; their bottom plates reach $V_{CTRLN}/V_{CTRLP}$ through short Metal4
+straps, their top plates the GND/VDD edge columns through TopMetal1 straps. The first version of this layout, with
+single-finger units in two columns around a 27-column Metal3 spine, measured 109 µm × 183 µm; the compact layout needs
+5.5 times less area and, as Section VI-D shows, carries less than half the routing capacitance on the critical nets.
 
 <p align="center"><img src="docs/figures/layout/fig_layout_full.png" width="100%" alt="full layout"></p>
-<p align="center"><b>Fig. 26.</b> Layout of RAMP_LR in IHP SG13G2 (all layers). Left column: the 6 × 5 NMOS
-bias array, the 2 × 3 PMOS bias array and the minimum-size stage-2/replica rows; right column: output stage, error
-amplifiers, stage-1 pairs, loads and the rhigh sensing resistors; centre: Metal3 spine under the two MIM capacitors.</p>
+<p align="center"><b>Fig. 29.</b> Layout of RAMP_LR in IHP SG13G2 with Metal4 and above hidden; the dashed
+outlines are the two 2-pF MIM capacitors, which cover the circuit. Bottom: NMOS bias mirror (four rows); middle: PMOS
+bias mirror and POTA load, NMOS signal row; top: PMOS signal row. Ports on Metal3 at the bottom (IBIAS, minus, plus,
+GND) and top (Vout, VDD) edges.</p>
 
 ### B. Matching
 
-Fig. 27 shows the matched groups. The techniques used are:
+Fig. 30 shows the matched groups. The techniques used are:
 
-- **Common centroid for differential pairs.** The stage-1 pair, the CMFB pair and both error-amplifier input pairs and
-  load mirrors are placed ABBA, so linear gradients in threshold voltage, oxide thickness or stress cancel to first
-  order (Fig. 27(b), (c)).
-- **Common-centroid current mirrors.** The 25 units of the NMOS bias mirror form a 6 × 5 array in which every
-  multi-unit device occupies point-symmetric positions about the array centre, where the reference sits (Fig. 27(a)); the
-  PMOS mirror is a 2 × 3 array with the diode in the centre.
-- **Replica next to the device it copies.** The reference diodes MN_R and MP_R, which set $I_Q$ through a 1:4 ratio, are
-  units of the same rows as MN3 and MP3, in the middle of them (Fig. 27(d), (e)); the stage-2 replica and the trip-point
-  replica devices are interleaved with the stage-2 devices of the same role.
-- **Dummies and identical surroundings.** Every row ends with dummy devices (29 in total, gates and diffusions tied to
-  the rail), all units of a row have the same orientation (source left, drain right, so drain currents flow the same
-  way), and each row has a continuous substrate or well tie strip.
-- **Resistors.** Each 100-kΩ rhigh resistor is split into four series segments placed ABBAABBA.
+- **Common centroid in a shared diffusion for differential pairs.** The stage-1 pair, the CMFB pair and both
+  error-amplifier input pairs are placed ABBA in one diffusion with the common tail between A and B, so linear
+  gradients cancel to first order and both devices see the same diffusion edges (Fig. 30(b), (f), (g)).
+- **Loads and diodes.** The stage-1 loads and the CMFB diodes are ABBA with shared VDD sources (Fig. 30(c)).
+- **Bias mirror.** The 25 units of 0.5/8 µm sit in four rows; the 10-unit tails T and C come in finger pairs that share
+  their drain, every row is symmetric about its centre, and the reference R is in the middle of the last row
+  (Fig. 30(a)). The arrangement is interdigitated rather than a full two-dimensional common centroid; the mirror
+  accuracy is set by the long channels (Table III).
+- **Replica next to the device it copies.** MP_R and MN_R share the diffusion of MP3 and MN3 (Fig. 30(d), (e));
+  the stage-2 replica and the trip-point replica are laid out as identical chains next to the signal-path chain
+  (Fig. 30(h)).
+- **Dummies and identical surroundings.** Every group ends in dummy fingers, all fingers of a strip have the same
+  orientation, and every strip has a tie at both ends.
+- **Resistors.** Each 100-kΩ rhigh resistor is ten 3.37-µm segments interleaved ABBA ABBA …, under merged implant and
+  silicide-block layers.
 
 <p align="center"><img src="docs/figures/layout/fig_layout_matching.png" width="100%" alt="matching structures"></p>
-<p align="center"><b>Fig. 27.</b> Matched groups (upper metals hidden). (a) NMOS bias mirror, 6 × 5 common
-centroid: R reference (MB0), T stage-1 tail (×10), C CMFB tail (×10), N NOTA tail (×2), Q and P the 1-µA branches for the
-replica references, D dummy. (b) Stage-1 pair A/B and CMFB pair C/E, ABBA, with the antenna capacitor K. (c) Stage-1
-loads A/B and CMFB diodes C/E. (d), (e) Output devices M around their replica R.</p>
-
-The layout is not optimised for parasitics: the tracks of a differential pair have different lengths to their spine
-columns, and the stage-1 output and the stage-2 outputs run through the spine between the two columns. Section VI-D
-shows what this costs.
+<p align="center"><b>Fig. 30.</b> Matched structures (Metal2 and above hidden). (a) NMOS bias mirror: R reference
+(MB0), T stage-1 tail (×10), C CMFB tail (×10), N NOTA tail (×2), Q and P the 1-µA branches, D dummy. (b) Stage-1 pair
+A/B and CMFB pair C/E, K the gate capacitor MCN. (c) Stage-1 loads A/B and CMFB diodes C/E. (d), (e) Output devices M
+next to their replicas R. (f), (g) POTA and NOTA input pairs. (h) Stage-2 PMOS chains of the signal path, the
+regulation-loop replica and the trip-point replica, every diffusion shared.</p>
 
 ### C. Physical verification
 
-<p align="center">TABLE VII<br>PHYSICAL VERIFICATION WITH THE IHP SG13G2 KLAYOUT DECKS (<code>layout/run_checks.sh</code>)</p>
+<p align="center">TABLE VIII<br>PHYSICAL VERIFICATION WITH THE IHP SG13G2 KLAYOUT DECKS (<code>layout/run_checks.sh</code>)</p>
 
 | Check | Deck / option | Result | Report |
 |:--|:--|:--|:--|
@@ -641,83 +716,86 @@ shows what this costs.
 | Antenna | `--antenna_only` | **0 violations** | `layout/reports/drc_antenna.txt` |
 | Density | `--density_only` | global Activ/GatPoly/metal density not met (block not filled; fill is inserted at chip level) | `layout/reports/drc_density.txt` |
 | LVS | `run_lvs.py` vs. flat xschem netlist | **match**: 53 device pairs, 33 nets, 0 mismatches | `layout/reports/lvs.txt` |
+| LVS of the extraction | magic netlist vs. xschem netlist, netgen (`layout/run_pex.sh`) | **match** | `layout/reports/pex.txt` |
 
-Three details were needed for a clean LVS: the MIM terminal order (bottom plate on the control voltage), grid-aligned
-widths, and the dummies, which the IHP deck removes from the layout netlist (`purge_devices` on devices whose terminals
+Four details were needed for a clean LVS: the PCell width parameter, which is the total width of all fingers of a
+multi-finger device, the MIM terminal order (bottom plate on the control voltage), grid-aligned widths, and the dummies, which the IHP deck removes from the layout netlist (`purge_devices` on devices whose terminals
 share one net) and which are therefore marked `lvs_ignore` in the schematic.
 
 ### D. Post-layout simulation
 
 The layout was extracted with magic [21] and the IHP SG13G2 extraction rules (`layout/run_pex.sh`): all devices as
-drawn, plus the area, fringe and coupling capacitance of every net above 0.01 fF — 415 capacitors, 0.74 pF in total.
+drawn, plus the area, fringe and coupling capacitance of every net above 0.01 fF — 913 capacitors, 0.52 pF in total.
 A netgen [22] LVS of the extracted device netlist against the schematic matches. Wire resistance was not extracted:
 the critical nets are high-impedance nodes (≥ 100 kΩ) on which tens of ohms of metal do not matter, but the IR drop on
-the supply and output rails during slewing is not covered. To make the internal nets comparable, the layout generator
-labels them with their schematic names (text only; an XOR of the old and new GDS shows no geometry change, and DRC and
-LVS were re-run). For simulation (`sim/postlayout.py`) the extracted cell gets the same current probe in the output-PMOS
-source as the schematic, and the eight nodes that touch only capacitors (the bodies of the rhigh resistors) are tied to
-ground through 1 TΩ; without this the DC matrix is singular, which is why an earlier attempt failed. With all parasitic
-capacitors removed the extracted netlist reproduces the schematic exactly (61.6°, 18.9 MHz at TT, 27 °C), so every
-difference below is caused by the parasitics. Table VIII summarises the comparison.
+the supply and output rails during slewing is not covered. The layout generator labels the internal nets with their
+schematic names (text only), so the extracted netlist is readable. For simulation (`sim/postlayout.py`) the ammeter
+VIQ of the schematic is inserted in the source connection of the four MP3 fingers inside the extracted cell (MP_R and
+the dummies in the same diffusion stay on VDD), and the 20 nodes that touch only capacitors (the bodies of the rhigh
+segments) are tied to ground through 1 TΩ, without which the DC matrix is singular. With all parasitic capacitors
+removed the extracted netlist agrees with the schematic to 0.1° and 1.3 % (61.5°, 19.0 MHz at TT, 27 °C), so the
+differences below are caused by the parasitics. Table IX summarises the comparison.
 
-<p align="center">TABLE VIII<br>SCHEMATIC VERSUS POST-LAYOUT (REGULATED, 1.65 V; <code>sim/results/postlayout_summary.csv</code>)</p>
+<p align="center">TABLE IX<br>SCHEMATIC VERSUS POST-LAYOUT (REGULATED, 1.65 V; <code>sim/results/postlayout_summary.csv</code>)</p>
 
 | Quantity | Schematic | Post-layout |
 |:--|:--:|:--:|
 | $I_Q$ / supply current at TT, 27 °C (µA) | 4.22 / 155.8 | 4.22 / 155.8 |
-| DC loop gain / DC PSRR / buffer offset at TT, 27 °C | 77.3 dB / 32.9 dB / −1.13 mV | 77.3 dB / 32.9 dB / −1.13 mV |
-| Unity-gain frequency at TT, 27 °C (MHz) | 18.8 | 15.5 |
-| Phase / gain margin at TT, 27 °C | 61.6° / 24.5 dB | **34.2° / 10.1 dB** |
-| Buffer 200-mV step at TT, 27 °C: overshoot / 0.1-% settling | 5.8 % / 53 ns | 21 % / 235 ns |
-| SC 4-mV step: error 250 ns after the step, TT, 27 °C | 0.032 % | 0.17 % |
-| Phase margin over the 15 corner/temperature points | 38–85° | **3.6–75°** |
-| Unity-gain frequency over the 15 points (MHz) | 5.4–31.2 | 5.3–22.8 |
-| Points with phase margin below 45° | 1 of 15 | **10 of 15** |
-| Points where the buffer does not settle to 0.1 % within 500 ns | 0 of 15 | 5 of 15 (oscillation at SS, −40 °C) |
+| DC loop gain / DC PSRR / buffer offset at TT, 27 °C | 77.3 dB / 32.9 dB / −1.13 mV | 77.4 dB / 33.0 dB / −1.12 mV |
+| Unity-gain frequency at TT, 27 °C (MHz) | 18.8 | 17.2 |
+| Phase / gain margin at TT, 27 °C | 61.6° / 24.5 dB | **44.4° / 14.1 dB** |
+| Buffer 200-mV step at TT, 27 °C: overshoot / 0.1-% settling | 5.8 % / 53 ns | 15 % / 128 ns |
+| SC 4-mV step: error 250 ns after the step / 0.1-% settling, TT, 27 °C | 0.032 % / 70 ns | 0.032 % / 111 ns |
+| Phase margin over the 15 corner/temperature points | 38–85° | **16–80°** |
+| Unity-gain frequency over the 15 points (MHz) | 5.4–31.2 | 5.5–26.1 |
+| Points with phase margin below 45° | 1 of 15 | **8 of 15** |
+| Points where the buffer does not settle to 0.1 % within 500 ns | 0 of 15 | 1 of 15 (oscillation at SS, −40 °C) |
 
-The DC behaviour is unchanged — bias currents, gain, supply rejection and offset agree to four digits — but the
-dynamics are not. The extracted capacitances move the non-dominant poles down: the unity-gain frequency falls by up to
-27 % and the phase margin by 10–34° (Figs. 28 and 30). At SS, −40 °C the 38° of the schematic become 4°
-and the buffer oscillates after a step; at TT it rings for about 150 ns (Fig. 29). The SC amplifier, whose
-feedback factor is 0.5, still settles at every point, but more slowly.
+The DC behaviour is unchanged — bias currents, gain, supply rejection and offset agree to three or four digits — but
+the extracted capacitances move the non-dominant poles down: the unity-gain frequency falls by up to 16 % and the phase
+margin by 5–22° (Figs. 31 and 33), most at low temperature where the margin was smallest to begin with. At
+SS, −40 °C the 38° of the schematic become 16° and the buffer oscillates after a step; at TT it rings for about 100 ns
+(Fig. 32). The SC amplifier, whose feedback factor is 0.5, settles at every point, and its static gain error is
+that of the schematic: the feedback input `plus` and the output no longer couple (below the 0.01-fF extraction
+threshold; 7 fF in the first layout, which showed up as a 0.14 % gain error).
 
 <p align="center"><img src="docs/figures/results/fig_postlayout_bode.png" width="100%" alt="schematic versus post-layout loop gain"></p>
-<p align="center"><b>Fig. 28.</b> Loop gain of the buffer, schematic (blue) and post-layout (orange, dashed), at
+<p align="center"><b>Fig. 31.</b> Loop gain of the buffer, schematic (blue) and post-layout (orange, dashed), at
 SS, −40 °C, TT, 27 °C and FF, 125 °C: (a)–(c) magnitude, (d)–(f) phase. Markers: unity-gain frequency.</p>
 
 <p align="center"><img src="docs/figures/results/fig_postlayout_steps.png" width="100%" alt="schematic versus post-layout step responses"></p>
-<p align="center"><b>Fig. 29.</b> Schematic versus post-layout step responses at the same three points:
+<p align="center"><b>Fig. 32.</b> Schematic versus post-layout step responses at the same three points:
 (a)–(c) buffer, 200-mV input step (grey dotted: input); (d)–(f) settling error of the SC amplifier after a 4-mV step
 (dotted: 0.1 %).</p>
 
 <p align="center"><img src="docs/figures/results/fig_postlayout_pvt.png" width="100%" alt="schematic versus post-layout over PVT"></p>
-<p align="center"><b>Fig. 30.</b> (a) Unity-gain frequency and (b) phase margin of the schematic and the
+<p align="center"><b>Fig. 33.</b> (a) Unity-gain frequency and (b) phase margin of the schematic and the
 post-layout netlist over process corner and temperature at 1.65 V (dotted: 45°).</p>
 
-**Which parasitics.** The sensitivity run of `sim/postlayout.py` removes the extracted capacitances of one net at a time
-(Fig. 31). The stage-1 output `Vo_STG1` dominates: it carries 44 fF — a 73-µm Metal3 spine column, Metal2 tracks
-in several channels and their coupling to other nets, mainly `V1_CM` (8.9 fF), `VDD` (5.8 fF) and `VCTRLP` (3.8 fF) — on
-a node whose resistance is set by the 100-kΩ rhigh loads, so its pole moves down towards the unity-gain frequency.
-Removing it alone restores 20–24° of phase margin. The stage-2 outputs `mp_dz` and `mn_dz` (21 and 36 fF)
-come second (+6–9°), the trip-point replica output third. The output node and the control voltages do not matter. One
-more coupling shows up in the SC test: the feedback input `plus` sits next to `Vout` in the spine with 7 fF between
-them, which adds to the 5-pF feedback capacitor and appears as a 0.14 % gain error (the 0.17 % floor in
-Fig. 29(d)–(f)).
+**Which parasitics.** The sensitivity run of `sim/postlayout.py` removes the extracted capacitances of one net group
+at a time (Fig. 34). The stage-1 output `Vo_STG1` matters most: its 19 fF (44 fF in the first layout) sit on a
+node whose resistance is set by the 100-kΩ rhigh loads, and removing them restores 11–14° of phase margin. The stage-2
+outputs `mp_dz` and `mn_dz` (14 and 10 fF, 21 and 36 fF before) come second with 2–5°; the control voltages (2–3°)
+and the trip-point replica output (below 1°) matter less. `Vo_STG1` has to reach the stage-1 drains in the middle channel and the stage-2 gates
+on both sides of the signal rows, so a 20-µm Metal3 column is the shortest route this floor plan allows. Giving the
+three critical nets a track of their own with empty neighbours, and twice the column spacing (option `CRIT` in
+`gen_layout.py`), cuts their capacitance by a further 24–42 % and gains about 5° (49° at TT, 20° at SS, −40 °C), but
+costs 17 % of area and still leaves the slow, cold corner unstable; the compact layout is kept.
 
 <p align="center"><img src="docs/figures/results/fig_postlayout_sens.png" width="60%" alt="phase margin with the parasitics of one net removed"></p>
-<p align="center"><b>Fig. 31.</b> Phase margin of the post-layout netlist with the extracted capacitances of one net
+<p align="center"><b>Fig. 34.</b> Phase margin of the post-layout netlist with the extracted capacitances of one net
 group removed, at TT, 27 °C and SS, −40 °C.</p>
 
-The layout is therefore DRC- and LVS-clean but not yet electrically acceptable. A second iteration should place the
-stage-2 rows next to the stage-1 loads so that `Vo_STG1`, `mp_dz` and `mn_dz` need no spine column, keep the
-high-impedance columns away from each other (or put `GND` shields between them), and separate `plus` from `Vout`;
-alternatively the first stage can be designed for the extra 45 fF (lower load resistance or a compensation zero).
+The post-layout margin is therefore limited by the circuit rather than by the routing: a 100-kΩ stage-1 output that
+cannot tolerate 20 fF is too sensitive for any layout. Lower stage-1 load resistance (with more stage-1 current), a
+compensation zero at the stage-1 output, or the passive compensation of [2, Ch. 4], [14] are the candidates; each
+changes the design and has to be re-verified over PVT and Monte Carlo.
 
 ---
 
 ## VII. Comparison with Prior Art
 
-<p align="center">TABLE IX<br>DEADZONE BIASING SCHEMES</p>
+<p align="center">TABLE X<br>DEADZONE BIASING SCHEMES</p>
 
 | | [1] | [4] | [6] | [12] | [2], [3] | **This work** |
 |:--|:--:|:--:|:--:|:--:|:--:|:--:|
@@ -725,10 +803,11 @@ alternatively the first stage can be designed for the extra 45 fF (lower load re
 | $I_Q$ independent of $V_{th}$ shifts | <img src="docs/figures/icons/sad.svg" width="14"> | <img src="docs/figures/icons/sad.svg" width="14"> | <img src="docs/figures/icons/sad.svg" width="14"> | <img src="docs/figures/icons/happy.svg" width="14"> claimed | <img src="docs/figures/icons/happy.svg" width="14"> | <img src="docs/figures/icons/happy.svg" width="14"> |
 | Verified over temperature | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/sad.svg" width="14"> no | <img src="docs/figures/icons/happy.svg" width="14"> −40…125 °C |
 | Verified over supply | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/happy.svg" width="14"> | <img src="docs/figures/icons/sad.svg" width="14"> no | <img src="docs/figures/icons/happy.svg" width="14"> ± 5 % |
-| Evidence | <img src="docs/figures/icons/neutral.svg" width="14"> not checked | <img src="docs/figures/icons/happy.svg" width="14"> silicon (ADC) | <img src="docs/figures/icons/happy.svg" width="14"> silicon (ADC) | <img src="docs/figures/icons/neutral.svg" width="14"> simulation | <img src="docs/figures/icons/neutral.svg" width="14"> simulation | <img src="docs/figures/icons/neutral.svg" width="14"> simulation incl. post-layout + DRC/LVS-clean layout |
+| Evidence | <img src="docs/figures/icons/neutral.svg" width="14"> not checked | <img src="docs/figures/icons/happy.svg" width="14"> silicon (ADC) | <img src="docs/figures/icons/happy.svg" width="14"> silicon (ADC) | <img src="docs/figures/icons/neutral.svg" width="14"> simulation | <img src="docs/figures/icons/neutral.svg" width="14"> simulation | <img src="docs/figures/icons/neutral.svg" width="14"> simulation incl. post-layout and Monte Carlo + DRC/LVS-clean layout |
+| $I_Q$ held under device mismatch (Monte Carlo) | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/neutral.svg" width="14"> n/r | <img src="docs/figures/icons/sad.svg" width="14"> checked: no (Section V-F) |
 | Design data and scripts public | <img src="docs/figures/icons/sad.svg" width="14"> | <img src="docs/figures/icons/sad.svg" width="14"> | <img src="docs/figures/icons/sad.svg" width="14"> | <img src="docs/figures/icons/sad.svg" width="14"> | <img src="docs/figures/icons/sad.svg" width="14"> | <img src="docs/figures/icons/happy.svg" width="14"> |
 
-<p align="center">TABLE X<br>FIGURES OF MERIT OF THE TWO DEADZONE-REGULATION STUDIES</p>
+<p align="center">TABLE XI<br>FIGURES OF MERIT OF THE TWO DEADZONE-REGULATION STUDIES</p>
 
 | | [2], [3] | **This work** |
 |:--|:--:|:--:|
@@ -741,9 +820,10 @@ alternatively the first stage can be designed for the extra 45 fF (lower load re
 | GBW/UGF spread, regulated, process only | 380–475 MHz (1.25×) | 13.7–21.7 MHz (1.59×) at 27 °C |
 | UGF spread, regulated, full PVT | n/r | 5.4–32.4 MHz (6×; fixed bias 860×) |
 | $I_Q$ spread, regulated, full PVT | n/r | 3.99–5.82 µA (fixed bias 0.003–32.7 µA) |
-| Phase margin, regulated | 61–72° | 48–75° at 27 °C, 35–85° full PVT (schematic); 18–54° at 27 °C after layout (C extraction) |
+| Phase margin, regulated | 61–72° | 48–75° at 27 °C, 35–85° full PVT (schematic); 29–62° at 27 °C after layout (C extraction) |
+| $I_Q$ under global / local variation (Monte Carlo, 5th–95th pct.) | n/r | 4.18–4.26 µA / 0.0003–153 µA |
 | Settling, regulated | ≤ 0.05 % (800-mV step, 4 ns) | ≤ 0.1 % at 250 ns for −40/27 °C; ≤ 1.6 % at 125 °C (4-mV step, SC) |
-| Power / area | n/r / no layout | 257 µW / 0.020 mm² |
+| Power / area | n/r / no layout | 257 µW / 0.0037 mm² |
 
 *n/r: not reported in the abstract or the text consulted for this report; not checked: the paper itself was not consulted for this row.* The two studies are not an apples-to-apples
 comparison: [2], [3] use a 65-nm process with about half the minimum channel length of the SG13G2 core devices and a
@@ -761,30 +841,35 @@ deadzone allows 0.003–32.7 µA, cuts the unity-gain-frequency spread from 860�
 settling failure (small-step error after 250 ns 28 % → 0.02 % at SS, −40 °C). The study also showed that the bias loops
 of a ringamp need the same stability analysis as the signal loop: in the original schematic, the regulation loops had
 −27° and 11° of phase margin and the ideal CMFB loop could not be simulated, while the main-loop AC analysis looked
-healthy. A layout-ready version with stable internal loops has a matched, DRC-, antenna- and LVS-clean layout of
-0.020 mm², but post-layout simulation shows that this first layout is not yet stable enough: the 44 fF of routing on the
-stage-1 output and the parasitics of the stage-2 outputs cost 10–34° of phase margin, and the buffer oscillates at
-SS, −40 °C.
+healthy. A layout-ready version with stable internal loops has a compact, matched, DRC-, antenna- and LVS-clean
+layout of 0.0037 mm². Two findings limit what the design can do as it stands. Post-layout simulation shows that the
+100-kΩ stage-1 output cannot absorb even the 19 fF of a compact layout (phase margin 61.6° → 44.4° at TT, oscillation at
+SS, −40 °C), and Monte Carlo shows that the regulation, which removes global process variation completely, does not
+help against local mismatch of the minimum-size stage-2 devices, which spreads $I_Q$ over more than five decades.
 
 **Limitations.**
 
-1. *Layout parasitics.* The post-layout netlist (capacitance only, no wire resistance) loses 10–34° of phase margin
-   and oscillates in the buffer configuration at SS, −40 °C (Section VI-D); the layout needs a second iteration before
-   the design can be used. No silicon.
-2. *Transistor CMFB.* DC PSRR 33 dB instead of 93 dB, 1.5 % common-mode-dependent gain error in the buffer, and loss of
-   headroom at 125 °C and low supply (Section V-G).
-3. *Temperature.* Constant $I_Q$ is not constant $g_{m3}$; the regulated UGF still falls 3.5× from −40 °C to 125 °C at TT
-   and the small-step settling exceeds 0.1 % at 125 °C (Section V-F).
-4. *Supply and devices.* The low-voltage devices run at 1.65 V, above their 1.2-V nominal supply; reliability limits were
+1. *Post-layout stability.* The post-layout netlist (capacitance only, no wire resistance) loses 5–22° of phase
+   margin and oscillates in the buffer configuration at SS, −40 °C (Section VI-D); the stage-1 output needs a design
+   change, not only routing. No silicon.
+2. *Mismatch.* With minimum-size stage-2, replica and reference devices, local mismatch moves $I_Q$ by orders of
+   magnitude and the regulation cannot correct it; 30 % of the Monte Carlo samples are practically switched off
+   (Section V-F).
+3. *Transistor CMFB.* DC PSRR 33 dB instead of 93 dB, 1.5 % common-mode-dependent gain error in the buffer, and loss of
+   headroom at 125 °C and low supply (Section V-H).
+4. *Temperature.* Constant $I_Q$ is not constant $g_{m3}$; the regulated UGF still falls 3.5× from −40 °C to 125 °C at TT
+   and the small-step settling exceeds 0.1 % at 125 °C (Section V-G).
+5. *Supply and devices.* The low-voltage devices run at 1.65 V, above their 1.2-V nominal supply; reliability limits were
    not checked.
-5. *Scope.* Only the single-ended design was characterised; the fully differential variant `Fully-Diff-RAMP/RAMP-FD.sch`
+6. *Scope.* Only the single-ended design was characterised; the fully differential variant `Fully-Diff-RAMP/RAMP-FD.sch`
    is unfinished (its two output stages differ: MN3 is m = 1 on one side and m = 4 on the other).
 
 **Next steps.** (i) A two-stage, properly compensated CMFB, or a fully differential first stage, to recover the supply
 rejection; lower-threshold or wider loads for headroom. (ii) A constant-gm or PTAT reference combined with
 temperature-compensated first stages. (iii) Smaller replica inverters to cut the 85 µA spent in the two replicas.
-(iv) A second layout iteration with short stage-1 and stage-2 output nets and shielded inputs (Section VI-D), then
-post-layout simulation with wire resistance; the passive compensation of [2, Ch. 4], [14] for the large-signal ringing. (v) A switched-capacitor test bench with real switches and both clock phases.
+(iv) Stage-2, replica, reference and error-amplifier devices sized for mismatch, together with a stage-1 output that
+tolerates the extra capacitance (lower load resistance, a compensation zero, or the passive compensation of
+[2, Ch. 4], [14]); then post-layout simulation with wire resistance and Monte Carlo of the post-layout netlist. (v) A switched-capacitor test bench with real switches and both clock phases.
 
 ---
 
@@ -843,6 +928,8 @@ magic [21] and netgen [22].
 
 [22] R. T. Edwards, *Netgen: Netlist comparison (LVS) and format manipulation*. [Online]. Available: http://opencircuitdesign.com/netgen/ (accessed Oct. 17, 2026).
 
+[23] M. J. M. Pelgrom, A. C. J. Duinmaijer, and A. P. G. Welbers, "Matching properties of MOS transistors," *IEEE J. Solid-State Circuits*, vol. 24, no. 5, pp. 1433–1439, Oct. 1989, doi: [10.1109/JSSC.1989.572629](https://doi.org/10.1109/JSSC.1989.572629).
+
 ---
 
 ## Appendix: Repository Structure
@@ -869,11 +956,12 @@ magic [21] and netgen [22].
 │   ├── run_pex.sh                    magic parasitic extraction + netgen LVS -> pex/
 │   ├── RAMP_LR.gds                   the layout
 │   ├── pex/RAMP_LR_pex.spice         extracted netlist with parasitic capacitances
-│   └── reports/                      check results quoted in Table VII
+│   └── reports/                      check results quoted in Table VIII
 ├── sim/
 │   ├── ramp_pvt.py                   PVT simulations (Section V) -> results/
 │   ├── internal_loops.py             loop gain of the bias loops (Table II)
 │   ├── postlayout.py                 schematic vs. post-layout (Section VI-D)
+│   ├── montecarlo.py                 Monte Carlo, global / local / both (Section V-F)
 │   ├── make_figures.py               result figures
 │   └── results/                      pvt_summary.csv, internal_loops.csv, waveforms of every corner
 ├── docs/
