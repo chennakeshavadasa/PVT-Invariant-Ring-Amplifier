@@ -357,14 +357,15 @@ def op_metrics(d: Path, orig=False) -> dict:
                 itot_ua=-1e6 * g("i(v2)"))
 
 
-def save_resampled(src: Path, dst: Path, dt: float, drop=("i(v2)", "v(vx)")) -> None:
+def save_resampled(src: Path, dst: Path, dt: float, drop=("i(v2)", "v(vx)"), keep=None,
+                   fmt="%.6g") -> None:
     """Keep the result files small: transient waveforms on a uniform grid."""
     d = read(src)
-    names = [n for n in d if n not in drop]
+    names = [n for n in d if n not in drop and (keep is None or n in keep)]
     t = d[names[0]]
     tg = np.arange(t[0], t[-1], dt)
     cols = [tg] + [np.interp(tg, t, d[n]) for n in names[1:]]
-    np.savetxt(dst, np.column_stack(cols), fmt="%.6g", header=" ".join(names), comments="")
+    np.savetxt(dst, np.column_stack(cols), fmt=fmt, header=" ".join(names), comments="")
 
 
 def main() -> int:
@@ -438,15 +439,19 @@ def main() -> int:
         d, tag = deck.parent, f"{bias}_{c[4:]}"
         if kind == "tsweep":
             shutil.copy(d / "tsweep.dat", RESULTS / f"tsweep_{tag}.dat")
-        elif kind == "lr" and vdd == VDD0 and t in (27,):
-            for k in ("loop", "psrr"):
-                shutil.copy(d / f"{k}.dat", RESULTS / f"{k}_{tag}_{t}.dat")
-            save_resampled(d / "tran.dat", RESULTS / f"tran_{tag}_{t}.dat", 0.5e-9)
+        elif kind == "lr" and vdd == VDD0:
+            # loop gain at every corner and temperature (cross-corner Bode plots)
+            if bias != "ptat" or t == 27:
+                shutil.copy(d / "loop.dat", RESULTS / f"loop_{tag}_{t}.dat")
+            if t == 27:
+                shutil.copy(d / "psrr.dat", RESULTS / f"psrr_{tag}_{t}.dat")
+                save_resampled(d / "tran.dat", RESULTS / f"tran_{tag}_{t}.dat", 0.5e-9)
         elif kind == "orig":
             shutil.copy(d / "loop.dat", RESULTS / f"loop_orig_{c[4:]}_27.dat")
-        elif kind == "sc" and vdd == VDD0 and bias != "ptat" and (
-                t == 27 or (c[4:], t) in (("ss", -40), ("sf", -40), ("ff", 125))):
-            save_resampled(d / "sc.dat", RESULTS / f"sc_{tag}_{t}.dat", 2e-9)
+        elif kind == "sc" and vdd == VDD0 and bias != "ptat":
+            # output waveform only, 9 digits (1 uV is 0.025 % of the 4 mV step)
+            save_resampled(d / "sc.dat", RESULTS / f"sc_{tag}_{t}.dat", 2e-9,
+                           keep=("time", "v(out)"), fmt="%.9g")
         elif kind == "power":
             shutil.copy(d / "power.dat", RESULTS / "power_tt_27.dat")
     (RESULTS / "fixed_bias.txt").write_text(
