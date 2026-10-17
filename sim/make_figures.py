@@ -803,8 +803,9 @@ if __name__ == "__main__":
     fig_postlayout_steps()
     fig_postlayout_pvt()
     fig_postlayout_sens()
-    fig_mc_iq()
-    fig_mc_perf()
-    fig_mc_waves()
+    if (RES / "mc_summary.csv").exists():      # written by sim/montecarlo.py
+        fig_mc_iq()
+        fig_mc_perf()
+        fig_mc_waves()
     fig_step_corners(2, "fig_step_corners_large.png", (-50, 600))
     fig_step_corners(0, "fig_step_corners_small.png", (-50, 2000))
