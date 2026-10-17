@@ -9,7 +9,7 @@ band share one gate channel below them and one source/drain channel above them.
   * gates are contacted below the unit, source/drain above, on Metal1 stubs,
   * each channel has one horizontal Metal2 track per net,
   * nets that appear in more than one channel get a vertical Metal3 column in
-    the spine; top-level pins are labelled on Metal3,
+    the spine; top-level pins and named internal nets are labelled on Metal3,
   * every row has a continuous substrate/well tie strip (LU rules),
   * the two 2 pF MIM capacitors sit on Metal5/TopMetal1 above the spine.
 """
@@ -346,6 +346,9 @@ def main():
         if n in PORTS:
             box("M3pin", x - hw, hi - 0.5, x + hw, hi + 0.3)
             TOP.shapes(L["M3text"]).insert(pya.Text(n, pya.Trans(um(x), um(hi - 0.1))))
+        elif "." not in n:
+            # name the internal nets (text only) so extracted netlists use the schematic names
+            TOP.shapes(L["M3text"]).insert(pya.Text(n, pya.Trans(um(x), um((lo + hi) / 2))))
 
     # 4) MIM decoupling capacitors over the spine (Metal5 / TopMetal1 only)
     c = pcell("cmim", w=f"{MIM_W}u", l=f"{MIM_W}u")

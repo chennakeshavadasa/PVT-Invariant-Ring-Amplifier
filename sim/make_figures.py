@@ -236,26 +236,33 @@ def fig_small_step():
 
 
 # ----------------------------------------------------------------------------
-def three_phase_data():
-    d = read(RES / "tran_reg_tt_27.dat")
+# phase colours (validated categorical slots): RC, large signal, small signal
+PHASE_COL = ("#6250d6", "#eda100", "#1baf7a")
+PHASE_TINT = ("#e4e1f8", "#fcefcf", "#d6f2e8")
+
+
+def three_phase_data(bias="reg", corner="tt", temp=27):
+    """Rising 200-mV step of the buffer and its three settling phases, from the waveforms:
+    RC while a stage-3 gate is within 0.25 V of a rail (device fully on), large signal while
+    |I_out| > 20 I_Q,TT (84 uA, about 15 % of the peak), small signal until 0.1 % settling."""
+    d = read(RES / f"tran_{bias}_{corner}_{temp}.dat")
     t, v = d["time"], d["v(out)"]
-    m = (t >= 95e-9) & (t <= 260e-9)
+    m = (t >= 95e-9) & (t <= 595e-9)
     t, v, vin = t[m], v[m], d["v(vicm)"][m]
     vgp, vgn = d["v(x1.mp_dz)"][m], d["v(x1.mn_dz)"][m]
     iout = 50e-12 * np.gradient(v, t) * 1e3      # mA, C_L dV/dt
-    iq = float(pick(bias="reg", corner="TT", temp_c=27, vdd=1.65)[0]["iq_ua"]) * 1e-3
+    i_ls = 20 * float(pick(bias="reg", corner="TT", temp_c=27, vdd=1.65)[0]["iq_ua"]) * 1e-3
     t_ns = (t - 100e-9) * 1e9
-    # phases from the waveforms: RC while a stage-3 gate is near a rail,
-    # large-signal while |I_out| >> I_Q, small-signal afterwards
-    rail = (vgp < 0.25) | (vgn > 1.40)
+    rail = ((vgp < 0.25) | (vgn > 1.40)) & (t_ns >= 0)
     t1 = t_ns[np.where(rail)[0][-1]] if rail.any() else 0.0
-    big = np.abs(iout) > 20 * iq
-    t2 = t_ns[np.where(big)[0][-1]] if big.any() else t1
-    return t_ns, v, vin, vgp, vgn, iout, t1, max(t2, t1)
+    big = (np.abs(iout) > i_ls) & (t_ns >= 0)
+    t2 = max(t_ns[np.where(big)[0][-1]] if big.any() else t1, t1)
+    ts = float(pick(bias=bias, corner=corner.upper(), temp_c=temp, vdd=1.65)[0]["ts01_rise_ns"])
+    return t_ns, v, vin, vgp, vgn, iout, t1, t2, max(ts, t2)
 
 
 def fig_three_phase():
-    t, v, vin, vgp, vgn, iout, t1, t2 = three_phase_data()
+    t, v, vin, vgp, vgn, iout, t1, t2, ts = three_phase_data()
     fig, axs = plt.subplots(3, 1, figsize=(COL1, 4.2), sharex=True)
     axs[0].plot(t, vin, ":", color=GREY, label="$V_{in}$")
     axs[0].plot(t, v, "-", color=BLUE, label="$V_{out}$")
@@ -268,10 +275,11 @@ def fig_three_phase():
     axs[2].plot(t, iout, "-", color=BLUE)
     axs[2].set(ylabel="$I_{out}=C_L\\,dV_{out}/dt$ (mA)", xlabel="Time after the input step (ns)")
     for ax in axs:
-        ax.axvspan(0, t1, color="#e8e8e8", lw=0)
-        ax.axvspan(t1, t2, color="#f4f4f4", lw=0)
+        ax.axvspan(0, t1, color=PHASE_TINT[0], lw=0)
+        ax.axvspan(t1, t2, color=PHASE_TINT[1], lw=0)
+        ax.axvspan(t2, ts, color=PHASE_TINT[2], lw=0)
         ax.set_xlim(-5, 120)
-    for x, s in ((t1 / 2, "RC"), ((t1 + t2) / 2, "LS"), ((t2 + 120) / 2, "small signal")):
+    for x, s in ((t1 / 2, "RC"), ((t1 + t2) / 2, "LS"), ((t2 + ts) / 2, "SS")):
         axs[0].text(x, 1.02, s, ha="center", va="bottom", transform=axs[0].get_xaxis_transform())
     for ax, s, y in zip(axs, "abc", (0.06, 0.94, 0.06)):
         ax.text(0.985, y, f"({s})", transform=ax.transAxes, ha="right", va="bottom" if y < 0.5 else "top")
@@ -280,8 +288,320 @@ def fig_three_phase():
     return t, v, vin, vgp, vgn, iout, t1, t2
 
 
+def phase_panels(axs, bias, corner, temp, show_legend=False):
+    """Three stacked panels (output, stage-3 gates, load current) with the phases shaded."""
+    t, v, vin, vgp, vgn, iout, t1, t2, ts = three_phase_data(bias, corner, temp)
+    col = BIAS[bias][0]
+    axs[0].plot(t, vin, ":", color=GREY, label="$V_{in}$")
+    axs[0].plot(t, v, "-", color=col, label="$V_{out}$")
+    axs[1].plot(t, vgp, "-", color=INK, label="$V_{GP}$")
+    axs[1].plot(t, vgn, "--", color=col, label="$V_{GN}$")
+    axs[2].plot(t, iout, "-", color=col)
+    for ax in axs:
+        for (a, b), tint in zip(((0, t1), (t1, t2), (t2, ts)), PHASE_TINT):
+            ax.axvspan(a, b, color=tint, lw=0)
+    axs[0].set_ylim(0.70, 0.96)
+    axs[1].set_ylim(-0.1, 1.75)
+    axs[2].set_ylim(-0.42, 0.85)
+    iq = pick(bias=bias, corner=corner.upper(), temp_c=temp, vdd=1.65)[0]["iq_ua"]
+    axs[2].text(0.97, 0.93, f"$I_Q$ = {iq:.3g} µA\n0.1 % at {ts:.0f} ns", transform=axs[2].transAxes,
+                ha="right", va="top", bbox=dict(fc="white", ec="none", pad=1.0))
+    if show_legend:
+        axs[0].legend(loc="lower right", handlelength=1.6)
+        axs[1].legend(loc="upper right", ncol=2, handlelength=1.6, columnspacing=0.8)
+    return t1, t2, ts
+
+
+THREE_PT = (("ss", -40), ("tt", 27), ("ff", 125))
+
+
+def fig_three_phase_corners():
+    fig, axs = plt.subplots(6, 3, figsize=(COL2, 7.6), sharex=True)
+    for r, bias in enumerate(("fix", "reg")):
+        for j, (c, t) in enumerate(THREE_PT):
+            phase_panels(axs[3 * r:3 * r + 3, j], bias, c, t, show_legend=(j == 0))
+            if j:
+                for ax in axs[3 * r:3 * r + 3, j]:
+                    ax.set_yticklabels([])
+        axs[3 * r, 0].set_ylabel("$V_{out}$ (V)")
+        axs[3 * r + 1, 0].set_ylabel("Gates (V)")
+        axs[3 * r + 2, 0].set_ylabel("$I_{out}$ (mA)")
+    for j, (c, t) in enumerate(THREE_PT):
+        axs[0, j].set_title(f"{c.upper()}, {t} °C".replace("-", "−"))
+        axs[-1, j].set(xlabel="Time after the input step (ns)", xlim=(-5, 120))
+    for n, ax in enumerate(axs.flat):
+        ax.text(0.03, 0.93, f"({chr(97 + n)})", transform=ax.transAxes, ha="left", va="top")
+    fig.tight_layout(h_pad=0.25, w_pad=0.4, rect=(0.025, 0, 1, 0.965))
+    h = [mpl.patches.Patch(color=c) for c in PHASE_TINT]
+    fig.legend(h, ["RC phase (stage-3 device fully on)", "large-signal phase", "small-signal phase to 0.1 %"],
+               loc="lower center", ncol=3, bbox_to_anchor=(0.5, 0.965), handlelength=1.4)
+    row_label(fig, axs[0:3, 0], BIAS_ROW["fix"])
+    row_label(fig, axs[3:6, 0], BIAS_ROW["reg"])
+    save(fig, "fig_three_phase_corners.png")
+
+
+def fig_phase_bars():
+    """Duration of the three phases at every corner and temperature, fixed vs regulated."""
+    pts = [(c, t) for c in CORNERS for t in (-40, 27, 125)]
+    fig, axs = plt.subplots(1, 2, figsize=(COL2, 4.3), sharey=True)
+    y = np.arange(len(pts))[::-1] + np.repeat(np.arange(len(CORNERS))[::-1] * 0.6, 3)
+    for ax, bias, title in ((axs[0], "fix", "Fixed bias (TT-tuned)"), (axs[1], "reg", "Deadzone regulation")):
+        for yy, (c, t) in zip(y, pts):
+            _, *_, t1, t2, ts = three_phase_data(bias, c.lower(), t)
+            left = 0.0
+            for w, col in zip((t1, t2 - t1, ts - t2), PHASE_COL):
+                ax.barh(yy, w, left=left, height=0.78, color=col, edgecolor="white", linewidth=1.0)
+                left += w
+            ax.text(ts + 4, yy, f"{ts:.0f}", va="center", ha="left")
+        ax.set_title(title)
+        ax.set(xlabel="Time after the input step (ns)", xlim=(0, 330))
+        ax.grid(axis="y", visible=False)
+    axs[0].set_yticks(y)
+    axs[0].set_yticklabels([f"{c} {t:>4} °C".replace("-", "−") for c, t in pts])
+    for ax, s in zip(axs, "ab"):
+        ax.text(0.985, 0.985, f"({s})", transform=ax.transAxes, ha="right", va="top")
+    h = [mpl.patches.Patch(color=c) for c in PHASE_COL]
+    fig.legend(h, ["RC", "large signal", "small signal to 0.1 %"], loc="lower center", ncol=3,
+               bbox_to_anchor=(0.5, 0.97), handlelength=1.4)
+    fig.tight_layout(w_pad=1.0, rect=(0, 0, 1, 0.97))
+    save(fig, "fig_phase_bars.png")
+
+
+# ----------------------------------------------------------------------------
+# schematic versus post-layout (sim/postlayout.py)
+def rows_csv(name):
+    out = []
+    for r in csv.DictReader(open(RES / name)):
+        for k, v in r.items():
+            try:
+                r[k] = float(v)
+            except ValueError:
+                pass
+        out.append(r)
+    return out
+
+
+VIEW = {"sch": (BLUE, "-", "o", "schematic"), "pex": (ORANGE, "--", "s", "post-layout (magic PEX, C only)")}
+
+
+def view_file(kind, view, corner, temp):
+    return RES / f"{kind}_{'reg' if view == 'sch' else 'pex'}_{corner}_{temp}.dat"
+
+
+def fig_postlayout_bode():
+    pl = rows_csv("postlayout_summary.csv")
+    fig, axs = plt.subplots(2, 3, figsize=(COL2, 3.9), sharex=True)
+    for j, (c, t) in enumerate(THREE_PT):
+        txt = []
+        for v in ("sch", "pex"):
+            col, ls, mk, lab = VIEW[v]
+            f, mag, ph = loop_tf(view_file("loop", v, c, t))
+            axs[0, j].semilogx(f, mag, ls, color=col, label=lab)
+            axs[1, j].semilogx(f, ph, ls, color=col)
+            r = [q for q in pl if q["view"] == v and q["corner"] == c.upper() and q["temp_c"] == t][0]
+            axs[0, j].plot(r["ugf_hz"], 0, mk, ms=4.5, mfc="white", mec=col, mew=1.0)
+            axs[1, j].plot(r["ugf_hz"], r["pm_deg"] - 180, mk, ms=4.5, mfc="white", mec=col, mew=1.0)
+            txt.append(r)
+        axs[0, j].text(0.97, 0.95, f"UGF {txt[0]['ugf_hz'] / 1e6:.1f} $\\rightarrow$ {txt[1]['ugf_hz'] / 1e6:.1f} MHz",
+                       transform=axs[0, j].transAxes, ha="right", va="top")
+        axs[1, j].text(0.03, 0.05, f"PM {txt[0]['pm_deg']:.0f}° $\\rightarrow$ {txt[1]['pm_deg']:.0f}°",
+                       transform=axs[1, j].transAxes, ha="left", va="bottom",
+                       bbox=dict(fc="white", ec="none", pad=1.0))
+        axs[0, j].set(ylim=(-40, 100), title=f"{c.upper()}, {t} °C".replace("-", "−"))
+        axs[1, j].set(ylim=(-360, 10), xlabel="Frequency (Hz)", xlim=(10, 1e9))
+        axs[1, j].set_yticks([-360, -270, -180, -90, 0])
+        axs[1, j].set_xticks([1e1, 1e3, 1e5, 1e7, 1e9])
+        axs[1, j].axhline(-180, color=GREY, lw=0.6, ls=":")
+        axs[0, j].axhline(0, color=GREY, lw=0.6, ls=":")
+        if j:
+            axs[0, j].set_yticklabels([])
+            axs[1, j].set_yticklabels([])
+    axs[0, 0].set_ylabel("$|T|$ (dB)")
+    axs[1, 0].set_ylabel("$\\angle T$ (deg)")
+    for n, ax in enumerate(axs.flat):
+        ax.text(0.03, 0.05 if n < 3 else 0.30, f"({chr(97 + n)})", transform=ax.transAxes, ha="left",
+                va="bottom" if n < 3 else "top")
+    fig.tight_layout(h_pad=0.3, w_pad=0.4, rect=(0, 0, 1, 0.94))
+    h, l = axs[0, 0].get_legend_handles_labels()
+    fig.legend(h, l, loc="lower center", ncol=2, bbox_to_anchor=(0.5, 0.94))
+    save(fig, "fig_postlayout_bode.png")
+
+
+def fig_postlayout_steps():
+    import ramp_pvt as rp
+    fig, axs = plt.subplots(2, 3, figsize=(COL2, 3.9))
+    for j, (c, t) in enumerate(THREE_PT):
+        for v in ("sch", "pex"):
+            col, ls, mk, lab = VIEW[v]
+            d = read(view_file("tran", v, c, t))
+            m = (d["time"] >= 95e-9) & (d["time"] <= 595e-9)
+            axs[0, j].plot((d["time"][m] - 100e-9) * 1e9, d["v(out)"][m], ls, color=col, label=lab)
+            tt, y = sc_edge(view_file("sc", v, c, t), 0)
+            k = tt >= 0
+            axs[1, j].semilogy(tt[k], 100 * np.abs(1 - y[k]), ls, color=col, lw=1.0)
+        axs[0, j].plot((d["time"][m] - 100e-9) * 1e9, d["v(vicm)"][m], ":", color=GREY, lw=0.9)
+        axs[0, j].set(xlim=(-5, 300), ylim=(0.70, 0.98), title=f"{c.upper()}, {t} °C".replace("-", "−"))
+        axs[1, j].set(xlim=(-20, 1000), ylim=(1e-3, 300), xlabel="Time after the step (ns)")
+        axs[1, j].set_yticks([1e-3, 1e-2, 1e-1, 1, 10, 100])
+        axs[1, j].axhline(0.1, color=INK, lw=0.8, ls=":")
+        if j:
+            axs[0, j].set_yticklabels([])
+            axs[1, j].set_yticklabels([])
+    axs[0, 0].set_ylabel("Buffer $V_{out}$ (V)")
+    axs[1, 0].set_ylabel("4-mV SC step\nsettling error (%)")
+    for n, ax in enumerate(axs.flat):
+        ax.text(0.97, 0.05 if n < 3 else 0.95, f"({chr(97 + n)})", transform=ax.transAxes, ha="right",
+                va="bottom" if n < 3 else "top")
+    fig.tight_layout(h_pad=0.6, w_pad=0.4, rect=(0, 0, 1, 0.94))
+    h, l = axs[0, 0].get_legend_handles_labels()
+    fig.legend(h, l, loc="lower center", ncol=2, bbox_to_anchor=(0.5, 0.94))
+    save(fig, "fig_postlayout_steps.png")
+
+
+def fig_postlayout_pvt():
+    """UGF and phase margin of schematic and post-layout over corners and temperature."""
+    pl = rows_csv("postlayout_summary.csv")
+    fig, axs = plt.subplots(2, 1, figsize=(COL2, 3.9), sharex=True)
+    for ax, key, scale in ((axs[0], "ugf_hz", 1e-6), (axs[1], "pm_deg", 1.0)):
+        xs = pvt_axis(ax, groups=ax is axs[1])
+        for v, off in (("sch", -0.15), ("pex", 0.15)):
+            col, ls, mk, lab = VIEW[v]
+            ys = [[q for q in pl if q["view"] == v and q["corner"] == c and q["temp_c"] == t][0][key] * scale
+                  for c in CORNERS for t in (-40, 27, 125)]
+            ax.plot(np.array(xs) + off, ys, mk, color=col, ms=5, mfc=col if v == "sch" else "white", label=lab)
+    axs[0].set(ylabel="Unity-gain freq. (MHz)", ylim=(0, 35))
+    axs[1].set(ylabel="Phase margin (deg)", ylim=(0, 95))
+    axs[1].axhline(45, color=INK, lw=0.8, ls=":")
+    axs[1].set_xlabel("Temperature (°C) and process corner, $V_{DD}$ = 1.65 V", labelpad=16)
+    axs[0].legend(loc="lower center", ncol=2, bbox_to_anchor=(0.5, 1.0))
+    panel(axs[0], "(a)")
+    panel(axs[1], "(b)")
+    fig.tight_layout(h_pad=0.6)
+    save(fig, "fig_postlayout_pvt.png")
+
+
+def fig_postlayout_sens():
+    """Phase margin when the parasitics of one net group are removed from the extraction."""
+    pl = rows_csv("postlayout_summary.csv")
+    sens = rows_csv("postlayout_sensitivity.csv")
+    labels = [r["removed"] for r in sens if r["corner"] == "TT"]
+    order = ["post-layout"] + labels[1:] + ["all parasitics removed"]
+    pm = {}
+    for corner, t in (("TT", 27), ("SS", -40)):
+        base = [q for q in pl if q["view"] == "pex" and q["corner"] == corner and q["temp_c"] == t][0]["pm_deg"]
+        pm[corner] = {"post-layout": base, **{r["removed"]: r["pm_deg"] for r in sens if r["corner"] == corner}}
+    fig, ax = plt.subplots(figsize=(COL1 + 0.6, 2.9))
+    y = np.arange(len(order))[::-1]
+    for corner, dy, col, lab in (("TT", 0.19, BLUE, "TT, 27 °C"), ("SS", -0.19, ORANGE, "SS, \u221240 °C")):
+        vals = [pm[corner][k] for k in order]
+        ax.barh(y + dy, vals, height=0.36, color=col, label=lab)
+        for yy, v in zip(y, vals):
+            ax.text(v + 0.8, yy + dy, f"{v:.0f}", va="center", ha="left")
+    short = {"post-layout": "all extracted C", "all parasitics removed": "no parasitics (= schematic)"}
+    ax.set_yticks(y)
+    ax.set_yticklabels([short.get(k, "without " + k.split(" (")[0]) for k in order])
+    ax.set(xlabel="Phase margin (deg)", xlim=(0, 72))
+    ax.grid(axis="y", visible=False)
+    ax.legend(loc="lower center", ncol=2, bbox_to_anchor=(0.5, 1.0))
+    fig.tight_layout()
+    save(fig, "fig_postlayout_sens.png")
+
+# ----------------------------------------------------------------------------
+# Monte Carlo (sim/montecarlo.py)
+MC_SETS = (("process", "global process"), ("mismatch", "local mismatch"), ("both", "process + mismatch"))
+
+
+def mc_rows():
+    return [r for r in rows_csv("mc_summary.csv") if r["ok"] == 1]
+
+
+def mc_vals(rows, mset, bias, key, scale=1.0):
+    return np.array([r[key] * scale for r in rows if r["set"] == mset and r["bias"] == bias])
+
+
+def fig_mc_iq():
+    rows = mc_rows()
+    fig, axs = plt.subplots(1, 3, figsize=(COL2, 2.5), sharey=True)
+    bins = np.logspace(-4, 3, 50)
+    for ax, (mset, title) in zip(axs, MC_SETS):
+        for bias in ("fix", "reg"):
+            col, mk, lab = BIAS[bias]
+            v = np.clip(mc_vals(rows, mset, bias, "iq_ua"), 1.1e-4, 900)
+            ax.hist(v, bins=bins, color=col, alpha=0.55 if bias == "fix" else 0.75, label=lab,
+                    histtype="stepfilled", edgecolor=col, linewidth=0.8)
+        ax.axvline(4.2, color=INK, lw=0.8, ls=":")
+        ax.set_xscale("log")
+        ax.set(xlim=(1e-4, 1e3), xlabel="$I_Q$ of output stage (µA)", title=title)
+        ax.set_xticks([1e-4, 1e-2, 1, 1e2])
+    axs[0].set_ylabel("Samples")
+    for ax, sl in zip(axs, "abc"):
+        ax.text(0.03, 0.96, f"({sl})", transform=ax.transAxes, ha="left", va="top")
+    fig.tight_layout(w_pad=0.6, rect=(0, 0, 1, 0.9))
+    h, l = axs[0].get_legend_handles_labels()
+    fig.legend(h, l, loc="lower center", ncol=2, bbox_to_anchor=(0.5, 0.9))
+    save(fig, "fig_mc_iq.png")
+
+
+def fig_mc_perf():
+    """Distributions of UGF, PM, buffer offset and SC small-step error (process + mismatch)."""
+    rows = mc_rows()
+    fig, axs = plt.subplots(1, 4, figsize=(COL2, 2.4))
+    spec = (("ugf_hz", 1e-6, "Unity-gain freq. (MHz)", np.logspace(-3, 2.5, 40), True),
+            ("pm_deg", 1.0, "Phase margin (deg)", np.linspace(0, 95, 39), False),
+            ("offset_mv", 1.0, "Buffer offset (mV)", np.linspace(-60, 60, 41), False),
+            ("sc_err250_Sr_pct", 1.0, "4-mV step error at 250 ns (%)", np.logspace(-2.5, 2.5, 41), True))
+    for ax, (key, sc, lab, bins, logx) in zip(axs, spec):
+        for bias in ("fix", "reg"):
+            col, mk, blab = BIAS[bias]
+            v = mc_vals(rows, "both", bias, key, sc)
+            v = v[np.isfinite(v)]
+            v = np.clip(v, bins[0] * 1.01, bins[-1] * 0.99) if logx else np.clip(v, bins[0] + 1e-9, bins[-1] - 1e-9)
+            ax.hist(v, bins=bins, color=col, alpha=0.55 if bias == "fix" else 0.75, histtype="stepfilled",
+                    edgecolor=col, linewidth=0.8, label=blab)
+        if logx:
+            ax.set_xscale("log")
+        ax.set(xlabel=lab)
+    axs[0].set_ylabel("Samples")
+    axs[3].axvline(0.1, color=INK, lw=0.8, ls=":")
+    for ax, sl in zip(axs, "abcd"):
+        ax.text(0.04, 0.96, f"({sl})", transform=ax.transAxes, ha="left", va="top")
+    fig.tight_layout(w_pad=0.5, rect=(0, 0, 1, 0.88))
+    h, l = axs[0].get_legend_handles_labels()
+    fig.legend(h, l, loc="lower center", ncol=2, bbox_to_anchor=(0.5, 0.88))
+    save(fig, "fig_mc_perf.png")
+
+
+def fig_mc_waves():
+    """Loop gain and 4-mV SC step of the first 100 samples (process + mismatch)."""
+    w = np.load(RES / "mc_waves.npz")
+    fig, axs = plt.subplots(2, 2, figsize=(COL2, 3.9), sharex="col")
+    for r, bias in enumerate(("fix", "reg")):
+        col = BIAS[bias][0]
+        f, loop = w[f"both_{bias}_f"], w[f"both_{bias}_loop"]
+        t, v = w[f"both_{bias}_t"], w[f"both_{bias}_vout"]
+        for k in range(loop.shape[0]):
+            axs[r, 0].semilogx(f, 20 * np.log10(np.abs(loop[k])), "-", color=col, lw=0.5, alpha=0.35)
+            y = (v[k] - v[k][0]) / -0.004
+            axs[r, 1].plot((t - 100e-9) * 1e9, y, "-", color=col, lw=0.5, alpha=0.35)
+        _, mag, _ = loop_tf(RES / "loop_reg_tt_27.dat")
+        f0, _, _ = loop_tf(RES / "loop_reg_tt_27.dat")
+        axs[r, 0].semilogx(f0, mag, "-", color=INK, lw=1.0, label="nominal (TT, 27 °C)")
+        axs[r, 0].set(ylim=(-40, 110), ylabel="$|T|$ (dB)")
+        axs[r, 0].axhline(0, color=GREY, lw=0.6, ls=":")
+        axs[r, 1].set(ylim=(-0.1, 1.3), ylabel="Normalised $V_{out}$")
+        axs[r, 0].text(0.97, 0.95, BIAS_ROW[bias], transform=axs[r, 0].transAxes, ha="right", va="top")
+    axs[1, 0].set(xlabel="Frequency (Hz)", xlim=(10, 1e9))
+    axs[1, 1].set(xlabel="Time after the 4-mV step (ns)", xlim=(-20, 1000))
+    axs[0, 0].legend(loc="lower left")
+    for ax, sl in zip(axs.flat, "abcd"):
+        ax.text(0.03, 0.05 if ax in axs[:, 0] else 0.95, f"({sl})", transform=ax.transAxes, ha="left",
+                va="bottom" if ax in axs[:, 0] else "top")
+    fig.tight_layout(h_pad=0.4, w_pad=1.0)
+    save(fig, "fig_mc_waves.png")
+
+
 def gif_three_phase():
-    t, v, vin, vgp, vgn, iout, t1, t2 = three_phase_data()
+    t, v, vin, vgp, vgn, iout, t1, t2, _ = three_phase_data()
     fig, axs = plt.subplots(3, 1, figsize=(4.6, 4.6), sharex=True, dpi=110)
     axs[0].plot(t, vin, ":", color=GREY)
     axs[0].plot(t, v, "-", color=BLUE)
@@ -477,5 +797,15 @@ if __name__ == "__main__":
     fig_power()
     fig_psrr()
     fig_bode_corners()
+    fig_three_phase_corners()
+    fig_phase_bars()
+    fig_postlayout_bode()
+    fig_postlayout_steps()
+    fig_postlayout_pvt()
+    fig_postlayout_sens()
+    if (RES / "mc_summary.csv").exists():      # written by sim/montecarlo.py
+        fig_mc_iq()
+        fig_mc_perf()
+        fig_mc_waves()
     fig_step_corners(2, "fig_step_corners_large.png", (-50, 600))
     fig_step_corners(0, "fig_step_corners_small.png", (-50, 2000))

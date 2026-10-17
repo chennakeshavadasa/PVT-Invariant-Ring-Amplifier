@@ -1,0 +1,2 @@
+magic PEX of RAMP_LR.gds: 415 parasitic capacitors, 0.74 pF in total (threshold 0.01 fF, C only)
+netgen LVS of the magic netlist vs. schematic: Circuits match uniquely

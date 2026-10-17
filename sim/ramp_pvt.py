@@ -119,8 +119,11 @@ def ibias_src(ptat=False):
             else f"I_B VDD IBIAS {IBIAS}")
 
 
-def testbench(name, sub, corner, temp, vdd, vcp=0.0, vcn=0.0, transient=True, orig=False, ptat=False):
-    d = BUILD / name
+def testbench(name, sub, corner, temp, vdd, vcp=0.0, vcn=0.0, transient=True, orig=False, ptat=False,
+              netlib=None, modeltext=None, build=None, psrr=True):
+    """netlib/modeltext/build override the sub-circuit library, the model sections and the
+    output directory (post-layout and Monte Carlo runs); psrr=False skips the supply AC run."""
+    d = (build or BUILD) / name
     d.mkdir(parents=True, exist_ok=True)
     lo, hi = VCM - STEP / 2, VCM + STEP / 2
     pwl = f"pwl(0 {lo} {T_EDGE} {lo} {T_EDGE + 1e-9} {hi} {T_FALL} {hi} {T_FALL + 1e-9} {lo})"
@@ -138,7 +141,7 @@ wrdata {d}/dc.dat v(out)
 tran 0.2n {T_STOP} 0 0.5n
 wrdata {d}/tran.dat v(out) v(vicm) v(x1.mp_dz) v(x1.mn_dz) i(v.x1.viq) i(v2)
 """ if transient else ""
-    psrr = f"""
+    psrr = "" if not psrr else f"""
 alter @iprobe1[acmag]=0
 alter @v2[acmag]=1
 ac dec 40 1 10G
@@ -148,8 +151,8 @@ let psrr_im = imag(psr)
 wrdata {d}/psrr.dat psrr_re psrr_im
 """ if not orig else ""
     deck = f"""* {name}
-.include {BUILD / lib}
-{models(corner)}.param vcp_fix={vcp} vcn_fix={vcn}
+.include {netlib or BUILD / lib}
+{modeltext or models(corner)}.param vcp_fix={vcp} vcn_fix={vcn}
 .temp {temp}
 {dut}
 V1 VICM GND dc {VCM} ac 0 {pwl}
@@ -173,17 +176,17 @@ quit
     return f
 
 
-def sc_deck(name, sub, corner, temp, vdd, vcp, vcn, ptat=False):
+def sc_deck(name, sub, corner, temp, vdd, vcp, vcn, ptat=False, netlib=None, modeltext=None, build=None):
     """Charge-transfer step response: the input common mode stays at VCM."""
-    d = BUILD / name
+    d = (build or BUILD) / name
     d.mkdir(parents=True, exist_ok=True)
     pts, v = [f"0 {VCM}"], VCM
     for t0, dv, _ in SC_EDGES:
         pts += [f"{t0} {v}", f"{t0 + 0.5e-9} {v + dv}"]
         v += dv
     deck = f"""* {name}: SC amplifier, gain -CS/CF
-.include {BUILD / 'lr_lib.spice'}
-{models(corner)}.param vcp_fix={vcp} vcn_fix={vcn}
+.include {netlib or BUILD / 'lr_lib.spice'}
+{modeltext or models(corner)}.param vcp_fix={vcp} vcn_fix={vcn}
 .temp {temp}
 x1 VDD GND IBIAS VCM vx out {sub}
 {ibias_src(ptat)}
@@ -278,7 +281,19 @@ quit
     return f
 
 
+SPICEINIT = None
+
+
 def ngspice(deck: Path) -> bool:
+    """Run one deck.  The jobs already run in parallel, so each ngspice gets one thread
+    (set num_threads=1 in a .spiceinit next to the deck, which ngspice reads instead of
+    ~/.spiceinit); otherwise its OpenMP threads oversubscribe the cores."""
+    global SPICEINIT
+    if SPICEINIT is None:
+        home = Path.home() / ".spiceinit"
+        pdk = Path(os.environ.get("PDK_ROOT", "")) / "ihp-sg13g2" / "libs.tech" / "ngspice" / ".spiceinit"
+        SPICEINIT = (home.read_text() if home.exists() else pdk.read_text()) + "\nset num_threads=1\n"
+    (deck.parent / ".spiceinit").write_text(SPICEINIT)
     r = subprocess.run(["ngspice", "-b", deck.name], cwd=deck.parent, capture_output=True, text=True)
     (deck.parent / "ngspice.log").write_text(r.stdout + r.stderr)
     return r.returncode == 0 and "simulation(s) aborted" not in r.stdout + r.stderr
@@ -445,6 +460,8 @@ def main() -> int:
                 shutil.copy(d / "loop.dat", RESULTS / f"loop_{tag}_{t}.dat")
             if t == 27:
                 shutil.copy(d / "psrr.dat", RESULTS / f"psrr_{tag}_{t}.dat")
+            if t == 27 or bias != "ptat":
+                # buffer step waveforms at every corner (three-phase settling figures)
                 save_resampled(d / "tran.dat", RESULTS / f"tran_{tag}_{t}.dat", 0.5e-9)
         elif kind == "orig":
             shutil.copy(d / "loop.dat", RESULTS / f"loop_orig_{c[4:]}_27.dat")
