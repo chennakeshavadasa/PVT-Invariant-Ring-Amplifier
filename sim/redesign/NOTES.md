@@ -10,6 +10,8 @@ study that leads to v2. Run from this directory; outputs go to `sim/build/redesi
 | `mc_attr.py` | Monte Carlo with mismatch enabled in one device group at a time (PDK `mm_ok` switch) |
 | `v2.py` | Parametric v2 netlist (PMOS-input stage 1, direct deadzone regulation, optional cascode, CMFB reference options, offset servo) and its evaluation |
 | `pgrid.py` | Runs many `v2.py` configurations in one process pool and ranks them |
+| `chk.py`, `dcsw.py`, `cmloop.py`, `regloop.py` | Corner check of one configuration; DC input sweep (gain error); CMFB loop gain; regulation/servo loop gains |
+| `grid*.py`, `range.py`, `servo_*.py`, `bw2.py` | The parameter studies in the order they were run (each prints one line per configuration) |
 
 ## Findings on v1 (RAMP_LR)
 
