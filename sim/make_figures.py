@@ -352,6 +352,116 @@ def fig_psrr():
     save(fig, "fig_psrr.png")
 
 
+# ----------------------------------------------------------------------------
+# cross-corner waveforms: 5 process corners overlaid, one panel per temperature
+TEMPS = (-40, 27, 125)
+BIAS_ROW = {"fix": "Fixed bias (TT-tuned)", "reg": "Deadzone regulation"}
+
+
+def corner_legend(fig, y=1.0, extra=()):
+    h = [mpl.lines.Line2D([], [], color=CSTYLE[c][0], ls=CSTYLE[c][1], marker=CSTYLE[c][2], ms=4,
+                          mfc="white") for c in CORNERS]
+    labels = [f"{c} corner" for c in CORNERS]
+    for lab, kw in extra:
+        h.append(mpl.lines.Line2D([], [], **kw))
+        labels.append(lab)
+    fig.legend(h, labels, loc="lower center", ncol=len(h), bbox_to_anchor=(0.5, y),
+               columnspacing=1.0 if extra else 1.4, handlelength=2.0 if extra else 2.4)
+
+
+def row_label(fig, axs, text):
+    """Bias label to the left of a group of rows."""
+    fig.canvas.draw()
+    top, bot = axs[0].get_position().y1, axs[-1].get_position().y0
+    fig.text(0.004, (top + bot) / 2, text, rotation=90, ha="left", va="center", fontweight="bold")
+
+
+def fig_bode_corners():
+    fig, axs = plt.subplots(4, 3, figsize=(COL2, 6.7), sharex=True)
+    for r, bias in enumerate(("fix", "reg")):
+        am, ap = axs[2 * r], axs[2 * r + 1]
+        for j, t in enumerate(TEMPS):
+            for c in CORNERS:
+                col, ls, mk = CSTYLE[c]
+                f, mag, ph = loop_tf(RES / f"loop_{bias}_{c.lower()}_{t}.dat")
+                am[j].semilogx(f, mag, ls, color=col)
+                ap[j].semilogx(f, ph, ls, color=col)
+                p = pick(bias=bias, corner=c, temp_c=t, vdd=1.65)[0]
+                am[j].plot(p["ugf_hz"], 0, mk, ms=4.5, mfc="white", mec=col, mew=1.0)
+                ap[j].plot(p["ugf_hz"], p["pm_deg"] - 180, mk, ms=4.5, mfc="white", mec=col, mew=1.0)
+            pts = pick(bias=bias, temp_c=t, vdd=1.65)
+            u = [q["ugf_hz"] / 1e6 for q in pts]
+            m = [q["pm_deg"] for q in pts]
+            am[j].text(0.97, 0.95, f"UGF {min(u):.2g}–{max(u):.2g} MHz", transform=am[j].transAxes,
+                       ha="right", va="top")
+            ap[j].text(0.03, 0.05, f"PM {min(m):.0f}–{max(m):.0f}$^\\circ$", transform=ap[j].transAxes,
+                       ha="left", va="bottom")
+            am[j].set(ylim=(-40, 100))
+            ap[j].set(ylim=(-360, 10))
+            ap[j].set_yticks([-360, -270, -180, -90, 0])
+            ap[j].axhline(-180, color=GREY, lw=0.6, ls=":")
+            am[j].axhline(0, color=GREY, lw=0.6, ls=":")
+            if j:
+                am[j].set_yticklabels([])
+                ap[j].set_yticklabels([])
+        am[0].set_ylabel("$|T|$ (dB)")
+        ap[0].set_ylabel("$\\angle T$ (deg)")
+    for j, t in enumerate(TEMPS):
+        axs[0, j].set_title(f"{t} °C".replace("-", "\u2212"))
+        axs[-1, j].set(xlabel="Frequency (Hz)", xlim=(10, 1e9))
+        axs[-1, j].set_xticks([1e1, 1e3, 1e5, 1e7, 1e9])
+    for k, ax in enumerate(axs.flat):
+        ax.text(0.03, 0.05 if k // 3 % 2 == 0 else 0.30, f"({'abcdefghijkl'[k]})", transform=ax.transAxes,
+                ha="left", va="bottom" if k // 3 % 2 == 0 else "top")
+    fig.tight_layout(h_pad=0.3, w_pad=0.4, rect=(0.025, 0, 1, 0.965))
+    corner_legend(fig, 0.965)
+    row_label(fig, axs[0:2, 0], BIAS_ROW["fix"])
+    row_label(fig, axs[2:4, 0], BIAS_ROW["reg"])
+    save(fig, "fig_bode_corners.png")
+
+
+def fig_step_corners(k, name, xlim):
+    """SC step response (edge k of SC_EDGES) for 5 corners x 3 temperatures, fixed vs regulated:
+    normalised output and its settling error |1 - V_out/V_ideal| on a log scale."""
+    tag = ("S" if k < 2 else "L") + "r"
+    fig, axs = plt.subplots(4, 3, figsize=(COL2, 6.7), sharex=True)
+    for r, bias in enumerate(("fix", "reg")):
+        aw, ae = axs[2 * r], axs[2 * r + 1]
+        for j, t in enumerate(TEMPS):
+            for i, c in enumerate(CORNERS):
+                col, ls, mk = CSTYLE[c]
+                tt, y = sc_edge(RES / f"sc_{bias}_{c.lower()}_{t}.dat", k)
+                every = max(1, len(tt) // 7)
+                mark = dict(marker=mk, ms=3.5, mfc="white", markevery=((i + 1) * every // 6, every))
+                aw[j].plot(tt, y, ls, color=col, **mark)
+                ae[j].semilogy(tt[tt >= 0], 100 * np.abs(1 - y[tt >= 0]), ls, color=col, lw=1.0, **mark)
+            err = max(pick(bias=bias, corner=c, temp_c=t, vdd=1.65)[0][f"sc_err250_{tag}_pct"] for c in CORNERS)
+            aw[j].text(0.97, 0.05, f"worst error at 250 ns: {err:.2g} %", transform=aw[j].transAxes,
+                       ha="right", va="bottom", bbox=dict(fc="white", ec="none", pad=1.0))
+            aw[j].set(ylim=(-0.08, 1.25))
+            ae[j].set(ylim=(1e-3, 300))
+            ae[j].set_yticks([1e-3, 1e-2, 1e-1, 1, 10, 100])
+            ae[j].axhline(0.1, color=INK, lw=0.8, ls=":")
+            for ax in (aw[j], ae[j]):
+                ax.axvline(250, color=GREY, lw=0.6, ls="--")
+            if j:
+                aw[j].set_yticklabels([])
+                ae[j].set_yticklabels([])
+        aw[0].set_ylabel("Normalised $V_{out}$")
+        ae[0].set_ylabel("Settling error (%)")
+    for j, t in enumerate(TEMPS):
+        axs[0, j].set_title(f"{t} °C".replace("-", "\u2212"))
+        axs[-1, j].set(xlabel="Time after the step (ns)", xlim=xlim)
+    for n, ax in enumerate(axs.flat):
+        ax.text(0.03, 0.95, f"({'abcdefghijkl'[n]})", transform=ax.transAxes, ha="left", va="top",
+                bbox=dict(fc="white", ec="none", pad=1.0))
+    fig.tight_layout(h_pad=0.3, w_pad=0.4, rect=(0.025, 0, 1, 0.965))
+    corner_legend(fig, 0.965, extra=(("0.1 % error", dict(color=INK, lw=0.8, ls=":")),
+                                     ("250 ns", dict(color=GREY, lw=0.6, ls="--"))))
+    row_label(fig, axs[0:2, 0], BIAS_ROW["fix"])
+    row_label(fig, axs[2:4, 0], BIAS_ROW["reg"])
+    save(fig, name)
+
 if __name__ == "__main__":
     import sys
     sys.path.insert(0, str(REPO / "sim"))
@@ -364,3 +474,6 @@ if __name__ == "__main__":
     gif_three_phase()
     fig_power()
     fig_psrr()
+    fig_bode_corners()
+    fig_step_corners(2, "fig_step_corners_large.png", (-50, 600))
+    fig_step_corners(0, "fig_step_corners_small.png", (-50, 2000))

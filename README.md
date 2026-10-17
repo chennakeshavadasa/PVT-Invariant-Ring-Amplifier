@@ -37,6 +37,7 @@ Nithin Purushothama &nbsp;·&nbsp; <a href="https://github.com/chennakeshavadasa
 - [III. Prior Art and Motivation](#iii-prior-art-and-motivation)
 - [IV. Circuit Implementation in IHP SG13G2](#iv-circuit-implementation-in-ihp-sg13g2)
 - [V. Simulation Results](#v-simulation-results)
+  - [E. Cross-corner waveforms (Bode and step responses, all corners)](#e-cross-corner-waveforms)
 - [VI. Layout](#vi-layout)
 - [VII. Comparison with Prior Art](#vii-comparison-with-prior-art)
 - [VIII. Conclusion, Limitations and Next Steps](#viii-conclusion-limitations-and-next-steps)
@@ -372,7 +373,7 @@ The single-stage transistor CMFB is the one compromise of the redesign. With the
 $V_{o1}$ is held by the feedback, so the other drain sees the 200-kΩ sensing path to a fixed node and the common-mode
 "plant" has only about 35 dB of gain; the ideal E1 contributed the missing 80 dB. Cascoding the loads does not help (the
 limit is the sensing path, not the load resistance), and a two-stage CMFB amplifier needs about 20 pF of compensation to
-be stable; both were tried and are not used. The consequences are quantified in Section V-F.
+be stable; both were tried and are not used. The consequences are quantified in Section V-G.
 
 ---
 
@@ -382,7 +383,8 @@ All results below are for RAMP_LR unless stated otherwise, at $V_{DD}$ = 1.65 V,
 *fixed-bias* reference is the same netlist with the regulation loop removed and $V_{CTRLP}/V_{CTRLN}$ held at the values
 the loop produces at TT, 27 °C (0.831 V / 0.822 V) — the experiment of [2, Table 3.1]. The MOS corners are those of the
 IHP models (TT, SS, FF, SF, FS); resistors and capacitors use their typical/worst/best sections with the matching MOS
-corner. Data: `sim/results/pvt_summary.csv` (109 rows).
+corner. Data: `sim/results/pvt_summary.csv` (109 rows). Section V-E shows the Bode plots and step responses
+of all five corners at each temperature (Figs. 19–21).
 
 ### A. Loop gain
 
@@ -425,7 +427,7 @@ there (Section II-C), and its phase margin is the lowest — the trade-off descr
 <p align="center"><img src="docs/figures/results/fig_pvt_ugf_pm.png" width="100%" alt="UGF and PM over PVT"></p>
 <p align="center"><b>Fig. 15.</b> (a) Unity-gain frequency and (b) phase margin over process corner and
 temperature; markers at 1.65 V, bars over 1.5675–1.7325 V. Orange: fixed bias; blue: deadzone regulation; grey
-triangles: regulation with an ideal PTAT reference current (Section V-E). The fixed-bias SS and SF bars at −40 °C
+triangles: regulation with an ideal PTAT reference current (Section V-F). The fixed-bias SS and SF bars at −40 °C
 continue below 0.1 MHz at the low supply.</p>
 
 Over all 45 PVT points the UGF spans 0.04–35.9 MHz with fixed bias (860×) and 5.4–32.4 MHz with regulation (6×). The
@@ -482,7 +484,44 @@ At TT, 27 °C the SC amplifier settles to 0.1 % of a 200-mV step in 40 ns and of
 are all at 125 °C, where the UGF has dropped to 5–12 MHz, with the worst case FF, 125 °C (1.6 %), whose DC loop gain of
 66 dB also leaves a 0.1-% static error at the feedback factor of 0.5.
 
-### E. Temperature: constant current is not constant transconductance
+### E. Cross-corner waveforms
+
+Figs. 19–21 overlay the five process corners at −40, 27 and 125 °C (1.65 V): the fixed-bias amplifier in the upper
+half of each figure, the regulated amplifier in the lower half. They are the waveforms behind the summary plots of
+Figs. 15 and 18 (data: `sim/results/loop_{fix,reg}_<corner>_<T>.dat` and `sc_{fix,reg}_<corner>_<T>.dat`).
+
+<p align="center"><img src="docs/figures/results/fig_bode_corners.png" width="100%" alt="loop gain over corners"></p>
+<p align="center"><b>Fig. 19.</b> Loop gain of the unity-gain buffer for the five process corners at −40, 27 and
+125 °C, 1.65 V. Fixed bias: (a)–(c) magnitude, (d)–(f) phase; deadzone regulation: (g)–(i) magnitude, (j)–(l) phase.
+Markers: unity-gain frequency and the phase there; the ranges printed in each panel are over the five corners.</p>
+
+With fixed bias the dominant pole, set by $C_L$ and the output resistance of the weak-inversion output stage
+($\propto 1/I_Q$), moves by two decades between the SS and FF corners at −40 °C, and the unity-gain frequency moves with
+it, from 0.56 to 36 MHz (Fig. 19(a), (d)). At 125 °C the fixed-bias corners are close together again (16–22 MHz), but
+every one of them then runs at 1.6 to 7 times the TT current (6.8–29 µA). With regulation the phase curves of the five
+corners lie on top of each other up to 1 MHz, and at each temperature the unity-gain frequencies stay within a factor
+of 1.3–2.1 (Fig. 19(g)–(l)). What remains is the common shift with temperature discussed in Section V-C and the lowest
+phase margin, 38° at SS, −40 °C.
+
+<p align="center"><img src="docs/figures/results/fig_step_corners_small.png" width="100%" alt="4-mV step over corners"></p>
+<p align="center"><b>Fig. 20.</b> SC response to a 4-mV input step (inside the deadzone) for the five process corners
+at −40, 27 and 125 °C, 1.65 V. Fixed bias: (a)–(c) normalised output, (d)–(f) settling error; deadzone regulation:
+(g)–(i) normalised output, (j)–(l) settling error. The error is taken against the ideal charge transfer.</p>
+
+<p align="center"><img src="docs/figures/results/fig_step_corners_large.png" width="100%" alt="200-mV step over corners"></p>
+<p align="center"><b>Fig. 21.</b> As Fig. 20 for a 200-mV input step (large signal).</p>
+
+Fig. 20 extends Fig. 17(b) to all corners. With fixed bias the SS and SF amplifiers at −40 °C ($I_Q$ = 0.03 and
+0.05 µA) settle along one slow exponential and are still 1.3 % and 0.34 % from the final value 2 µs after the step
+(Fig. 20(d)); at 27 °C the same two corners take 240–320 ns to reach 0.1 %. With regulation every corner at −40 °C and
+27 °C settles to 0.1 % in 53–157 ns. At 125 °C the regulated corners take 137–290 ns, and FF does not reach 0.1 % at
+all: its 66-dB loop gain leaves a static error of about 0.1 % (Section V-D). For the 200-mV step (Fig. 21) the RC and
+large-signal phases do most of the work and the corners are much closer: the worst fixed-bias case, SS at −40 °C,
+reaches 0.1 % after 830 ns, against 31–124 ns for the regulated amplifier at −40 °C and 27 °C. The slow rise of the
+residual error over the 2-µs window of Fig. 20 is the 1-GΩ DC feedback resistor discharging $C_F$
+($\tau = R_F C_F$ = 5 ms), not the amplifier.
+
+### F. Temperature: constant current is not constant transconductance
 
 Regulating $I_Q$ to a constant current fixes the process dependence but not the temperature dependence of $g_{m3}$; [2]
 notes that a constant-gm reference would be the natural $I_{BIAS}$. As a first test, $I_{BIAS}$ was made ideally
@@ -491,7 +530,7 @@ the UGF at TT from 3.5× to 2.2× and the total spread from 6× to 4.3× (grey t
 remain the slowest because $A_1A_2$ also falls with temperature, and the small-step error at 125 °C is not
 reduced (up to 1.2 %, Table V). A complete solution must compensate the first two stages as well.
 
-### F. Supply rejection, common-mode error and headroom
+### G. Supply rejection, common-mode error and headroom
 
 Table VI lists the figures that the layout-ready redesign made worse; all three follow from the 35-dB transistor CMFB
 (Section IV-D) and the 1.2-V source-gate drop of the hv PMOS loads of stage 1.
@@ -510,15 +549,15 @@ In the buffer the input common mode moves with the signal; the CMFB lets the sec
 100-kΩ loads), appears as input-referred error. A supply change shifts the common mode in the same way. In the SC test
 the inputs stay at the virtual ground and the effect disappears from the settling results above, but the supply
 rejection applies to every configuration. At 125 °C and low supply the CMFB also runs out of headroom and the buffer
-gains only 0.67–0.92 across the corners. Fig. 19 shows the PSRR versus frequency.
+gains only 0.67–0.92 across the corners. Fig. 22 shows the PSRR versus frequency.
 
 <p align="center"><img src="docs/figures/results/fig_psrr.png" width="55%" alt="PSRR"></p>
-<p align="center"><b>Fig. 19.</b> Power-supply rejection of the closed-loop buffer (RAMP_LR, regulated,
+<p align="center"><b>Fig. 22.</b> Power-supply rejection of the closed-loop buffer (RAMP_LR, regulated,
 27 °C) for the five corners.</p>
 
-### G. Power
+### H. Power
 
-The amplifier draws 156 µA (257 µW) at TT, 27 °C (Fig. 20). The output stage itself takes only 4.2 µA; most of the
+The amplifier draws 156 µA (257 µW) at TT, 27 °C (Fig. 23). The output stage itself takes only 4.2 µA; most of the
 current flows through the minimum-size inverters biased at their switching point — stage 2 (38 µA), its replica in the
 regulation loop (≈ 38 µA of the 41 µA of that block) and the trip-point replica that generates $V_{1,CM}$ (47 µA). The
 regulation loop as a whole costs 27 % of the supply current. Scaling the replica inverters down (longer channels) is the
@@ -526,7 +565,7 @@ largest available power saving; the signal-path inverters of stage 2 set the sec
 traded against them.
 
 <p align="center"><img src="docs/figures/results/fig_power.png" width="65%" alt="power breakdown"></p>
-<p align="center"><b>Fig. 20.</b> Supply current by block at TT, 27 °C, 1.65 V, amplifier at rest; the
+<p align="center"><b>Fig. 23.</b> Supply current by block at TT, 27 °C, 1.65 V, amplifier at rest; the
 deadzone regulation loop is highlighted.</p>
 
 ---
@@ -535,7 +574,7 @@ deadzone regulation loop is highlighted.</p>
 
 ### A. Floor plan and routing
 
-The layout (`layout/RAMP_LR.gds`, Fig. 21) is generated by `layout/gen_layout.py` in KLayout from the IHP PCells
+The layout (`layout/RAMP_LR.gds`, Fig. 24) is generated by `layout/gen_layout.py` in KLayout from the IHP PCells
 [17], [20]. Every transistor is placed as unit devices with one finger (a device with multiplier *m* becomes *m* units)
 in rows of identical W/L and orientation. The rows form two columns with a Metal3 routing spine between them; each
 horizontal band holds one left and one right row, which share a gate channel below and a source/drain channel above.
@@ -545,22 +584,22 @@ columns). The two 2-pF MIM capacitors sit on Metal5/TopMetal1 above the spine, w
 measures 109 µm × 183 µm (0.020 mm²).
 
 <p align="center"><img src="docs/figures/layout/fig_layout_full.png" width="100%" alt="full layout"></p>
-<p align="center"><b>Fig. 21.</b> Layout of RAMP_LR in IHP SG13G2 (all layers). Left column: the 6 × 5 NMOS
+<p align="center"><b>Fig. 24.</b> Layout of RAMP_LR in IHP SG13G2 (all layers). Left column: the 6 × 5 NMOS
 bias array, the 2 × 3 PMOS bias array and the minimum-size stage-2/replica rows; right column: output stage, error
 amplifiers, stage-1 pairs, loads and the rhigh sensing resistors; centre: Metal3 spine under the two MIM capacitors.</p>
 
 ### B. Matching
 
-Fig. 22 shows the matched groups. The techniques used are:
+Fig. 25 shows the matched groups. The techniques used are:
 
 - **Common centroid for differential pairs.** The stage-1 pair, the CMFB pair and both error-amplifier input pairs and
   load mirrors are placed ABBA, so linear gradients in threshold voltage, oxide thickness or stress cancel to first
-  order (Fig. 22(b), (c)).
+  order (Fig. 25(b), (c)).
 - **Common-centroid current mirrors.** The 25 units of the NMOS bias mirror form a 6 × 5 array in which every
-  multi-unit device occupies point-symmetric positions about the array centre, where the reference sits (Fig. 22(a)); the
+  multi-unit device occupies point-symmetric positions about the array centre, where the reference sits (Fig. 25(a)); the
   PMOS mirror is a 2 × 3 array with the diode in the centre.
 - **Replica next to the device it copies.** The reference diodes MN_R and MP_R, which set $I_Q$ through a 1:4 ratio, are
-  units of the same rows as MN3 and MP3, in the middle of them (Fig. 22(d), (e)); the stage-2 replica and the trip-point
+  units of the same rows as MN3 and MP3, in the middle of them (Fig. 25(d), (e)); the stage-2 replica and the trip-point
   replica devices are interleaved with the stage-2 devices of the same role.
 - **Dummies and identical surroundings.** Every row ends with dummy devices (29 in total, gates and diffusions tied to
   the rail), all units of a row have the same orientation (source left, drain right, so drain currents flow the same
@@ -568,7 +607,7 @@ Fig. 22 shows the matched groups. The techniques used are:
 - **Resistors.** Each 100-kΩ rhigh resistor is split into four series segments placed ABBAABBA.
 
 <p align="center"><img src="docs/figures/layout/fig_layout_matching.png" width="100%" alt="matching structures"></p>
-<p align="center"><b>Fig. 22.</b> Matched groups (upper metals hidden). (a) NMOS bias mirror, 6 × 5 common
+<p align="center"><b>Fig. 25.</b> Matched groups (upper metals hidden). (a) NMOS bias mirror, 6 × 5 common
 centroid: R reference (MB0), T stage-1 tail (×10), C CMFB tail (×10), N NOTA tail (×2), Q and P the 1-µA branches for the
 replica references, D dummy. (b) Stage-1 pair A/B and CMFB pair C/E, ABBA, with the antenna capacitor K. (c) Stage-1
 loads A/B and CMFB diodes C/E. (d), (e) Output devices M around their replica R.</p>
@@ -650,9 +689,9 @@ healthy. A layout-ready version with stable internal loops has a matched, DRC-, 
    stages 1 and 2: high-impedance nodes driven by small devices and routed over long Metal2 tracks to the spine, whose
    capacitance moves the non-dominant poles and therefore the phase margin.
 2. *Transistor CMFB.* DC PSRR 33 dB instead of 93 dB, 1.5 % common-mode-dependent gain error in the buffer, and loss of
-   headroom at 125 °C and low supply (Section V-F).
+   headroom at 125 °C and low supply (Section V-G).
 3. *Temperature.* Constant $I_Q$ is not constant $g_{m3}$; the regulated UGF still falls 3.5× from −40 °C to 125 °C at TT
-   and the small-step settling exceeds 0.1 % at 125 °C (Section V-E).
+   and the small-step settling exceeds 0.1 % at 125 °C (Section V-F).
 4. *Supply and devices.* The low-voltage devices run at 1.65 V, above their 1.2-V nominal supply; reliability limits were
    not checked.
 5. *Scope.* Only the single-ended design was characterised; the fully differential variant `Fully-Diff-RAMP/RAMP-FD.sch`
@@ -745,7 +784,7 @@ design uses the IHP SG13G2 open-source PDK [17] and the open-source tools xschem
 │   ├── ramp_pvt.py                   PVT simulations (Section V) -> results/
 │   ├── internal_loops.py             loop gain of the bias loops (Table II)
 │   ├── make_figures.py               result figures
-│   └── results/                      pvt_summary.csv, internal_loops.csv, waveforms
+│   └── results/                      pvt_summary.csv, internal_loops.csv, waveforms of every corner
 ├── docs/
 │   ├── figures/                      thesis/, schematics/, diagrams/, results/, layout/, icons/
 │   ├── export_schematics.sh          xschem -> PNG
