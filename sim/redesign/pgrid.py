@@ -11,7 +11,7 @@ def run_all(specs, corners=v2.CORNERS, threads=15):
         f = v2.with_par(v2.lib(p, name))
         for c, t in corners:
             d = v2.OUT / f"{name}_{c[4:]}_{t}"
-            jobs.append((d, v2.tb(f, d, c, t, ptat=bool(p.get("ptat")))))
+            jobs.append((d, v2.tb(f, d, c, t, ptat=p.get("ptat"))))
     with ThreadPoolExecutor(threads) as ex:
         list(ex.map(lambda j: v2.run(*j), jobs))
     res = {}

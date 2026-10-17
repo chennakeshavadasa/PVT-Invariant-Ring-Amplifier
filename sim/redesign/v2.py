@@ -41,16 +41,36 @@ DEF = dict(
     reg="ideal", greg=1.3e-6,          # regulation: "ideal" integrator (gm greg into Cn) or "ota"
     casc=False, cas_w=2.0, cas_l=0.13, cas_m=2, vcas=0.58,   # PMOS cascode on the input pair
     cmref="trip", Rlp=2e6, Clp=1e-12,                        # CMFB reference: "servo" (LPF of Vo_STG1) or "trip"
-    servo="none", gsv=1e-6, csv=1e-12, itrim=3e-6,          # offset servo: "none" or "ideal" (integrates Vo1 - net2)
+    servo="none", gsv=1e-6, csv=1e-12, itrim=3e-6,
+    cmfb="diode", cml_w=1.0, cml_l=2.0, ccm=0.0, rcm=0,     # CMFB load: "diode" (low gain) or "mirror" (+ rcm across)
+    cmsense="net3",                                          # CMFB senses net3 (output CM) or net2 (non-signal output only)
+    cmsplit=False, rcl=1e6, ccl=0.5e-12,                     # Vo_STG1-side load gate through an RC low-pass
+    tl_w=1.0, tl_l=2.0,                                      # PMOS tail-mirror unit (2 uA each)
+    ccr=1e-12, reg_l=24, reg_w=1.0, rz=33e3,                 # regulation Miller integrator: Cc, tail-device L (0.5/L), pair W
+    ccs=2e-12, srv_l=24, rta=1e6, rtb=150e3,                 # offset servo: Cc, tail-device L, trim divider          # offset servo: "none" or "ideal" (integrates Vo1 - net2)
     mdz_l=0.13,                        # length of the VDZP starve device
 )
 
 
 def lib(p, name):
     q = dict(DEF, **p)
+    def miller(pre, inp, inm, out, ccv, itail_l, w_in, l_in):
+        """Two-stage Miller integrator: NMOS pair (gate inp raises out), PMOS mirror, PMOS CS + NMOS sink."""
+        return (f"X{pre}1 {pre}d1 {inm} {pre}t GND sg13_lv_nmos w={w_in}u l={l_in}u ng=1 m=1\n"
+                f"X{pre}2 {pre}o1 {inp} {pre}t GND sg13_lv_nmos w={w_in}u l={l_in}u ng=1 m=1\n"
+                f"X{pre}3 {pre}d1 {pre}d1 VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m=1\n"
+                f"X{pre}4 {pre}o1 {pre}d1 VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m=1\n"
+                f"X{pre}5 {pre}t IBIAS GND GND sg13_lv_nmos w=0.5u l={itail_l}u ng=1 m=1\n"
+                f"X{pre}6 {out} {pre}o1 VDD VDD sg13_lv_pmos w=1u l=1u ng=1 m=1\n"
+                f"X{pre}7 {out} IBIAS GND GND sg13_lv_nmos w=0.5u l=8u ng=1 m=1\n"
+                f"X{pre}Z {out} {pre}z GND rhigh w=0.5e-6 l={q['rz'] / RSQ:.4g}e-6 m=1 b=0\n"
+                f"C{pre}C {pre}z {pre}o1 {ccv}")
     rl = q["R"] / RSQ
     mpc = q["ld_m"] * q["cm_tail"] // q["tail"]          # CMFB diodes : loads = CMFB tail : stage-1 tail
-    assert mpc >= 1 and mpc * q["tail"] == q["ld_m"] * q["cm_tail"], "load/diode ratio"
+    cmsense = q["cmsense"]
+    vo1gate = "vcmlp" if q["cmsplit"] else "vcmfb"
+    if q["cmfb"] == "diode":
+        assert mpc >= 1 and mpc * q["tail"] == q["ld_m"] * q["cm_tail"], "load/diode ratio"
     nseg = int(np.ceil(rl / 10))
     t = f"""* RAMP v2 prototype {name}
 .subckt RAMP_V2 VDD GND IBIAS minus plus Vout
@@ -66,13 +86,12 @@ XMBP2 icm pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m={q['cm_tail'] // 2}
 * ---- stage 1: PMOS input pair, NMOS loads, rhigh CM sense, PMOS-pair CMFB -----------------
 {{s1pair}}
 XMP1 net2 vcmfb GND GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={q['ld_m']}
-XMP2 Vo_STG1 vcmfb GND GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={q['ld_m']}
+XMP2 Vo_STG1 {vo1gate} GND GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={q['ld_m']}
 XR1 net2 net3 GND rhigh w=0.5e-6 l={rl:.4g}e-6 m=1 b=0
 XR3 Vo_STG1 net3 GND rhigh w=0.5e-6 l={rl:.4g}e-6 m=1 b=0
 XMC1 vcmfb V1_CM icm VDD sg13_lv_pmos w={q['mc_w']}u l={q['mc_l']}u ng=1 m={q['mc_m']}
-XMC2 dB net3 icm VDD sg13_lv_pmos w={q['mc_w']}u l={q['mc_l']}u ng=1 m={q['mc_m']}
-XMPC1 vcmfb vcmfb GND GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={mpc}
-XMPC2 dB dB GND GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={mpc}
+XMC2 dB {cmsense} icm VDD sg13_lv_pmos w={q['mc_w']}u l={q['mc_l']}u ng=1 m={q['mc_m']}
+{{cmfbload}}
 {{cmref}}
 * ---- stage 2 ------------------------------------------------------------------------
 XMN_STG2_3N1 mn_dz Vo_STG1 GND GND sg13_lv_nmos w=0.15u l=0.13u ng=1 m={q['kN']}
@@ -89,7 +108,7 @@ XM2 Vout mp_dz vdd_q VDD sg13_hv_pmos w={q['mp3_w']}u l=0.5u ng=1 m={q['mp3_m']}
 XMP_R irn irn VDD VDD sg13_hv_pmos w={q['mp3_w']}u l=0.5u ng=1 m={q['mpr_m']}
 XRS mp_dz vgps GND rhigh w=0.5e-6 l={q['Rs'] / RSQ:.4g}e-6 m=1 b=0
 {{ota}}
-CCN VCTRLN GND {q['Cn']}
+CCN VCTRLN GND {q["Cn"]}
 * ---- fixed starve bias of the VDZN inverter ---------------------------------------------
 XMD VCTRLP VCTRLP VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m=1
 .ends
@@ -103,6 +122,27 @@ XMD VCTRLP VCTRLP VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m=1
                  f"XMT2 V1_CM V1_CM ntr VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m={3 * q['kN']}\n"
                  f"XMT3 ntr VCTRLP VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m={5 * q['kN']}")
     t = t.replace("{cmref}", cmref)
+    if q["cmfb"] == "mirror":     # high-gain CMFB: NMOS mirror load, high-impedance output vcmfb
+        cl = (f"XMPC1 vcmfb dB GND GND sg13_lv_nmos w={q['cml_w']}u l={q['cml_l']}u ng=1 m=1\n"
+              f"XMPC2 dB dB GND GND sg13_lv_nmos w={q['cml_w']}u l={q['cml_l']}u ng=1 m=1\n"
+              f"CCM vcmfb GND {q['ccm']}" + (f"\nXRCM vcmfb dB GND rhigh w=0.5e-6 l={q['rcm'] / RSQ:.4g}e-6 m=1 b=0" if q['rcm'] else ""))
+    else:
+        cl = (f"XMPC1 vcmfb vcmfb GND GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={mpc}\n"
+              f"XMPC2 dB dB GND GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={mpc}")
+    if q["cmsplit"]:
+        cl += (f"\nXRCL vcmfb vcmlp GND rhigh w=0.5e-6 l={q['rcl'] / RSQ:.4g}e-6 m=1 b=0\nCCL vcmlp GND {q['ccl']}")
+    t = t.replace("{cmfbload}", cl)
+    t = t.replace("XMBP0 pb pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m=1",
+                  f"XMBP0 pb pb VDD VDD sg13_lv_pmos w={q['tl_w']}u l={q['tl_l']}u ng=1 m=1")
+    t = t.replace(f"XMBP1 it1 pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m={q['tail'] // 2}",
+                  f"XMBP1 it1 pb VDD VDD sg13_lv_pmos w={q['tl_w']}u l={q['tl_l']}u ng=1 m={q['tail'] // 2}")
+    t = t.replace(f"XMBP2 icm pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m={q['cm_tail'] // 2}",
+                  f"XMBP2 icm pb VDD VDD sg13_lv_pmos w={q['tl_w']}u l={q['tl_l']}u ng=1 m={q['cm_tail'] // 2}")
+    if q["servo"] == "miller":
+        t = t.replace("XMT1 V1_CM V1_CM GND", "XMT1 vtrip vtrip GND").replace("XMT2 V1_CM V1_CM ntr", "XMT2 vtrip vtrip ntr")
+        t = t.replace(".ends", miller("XSV", "Vo_STG1", "net2", "VSV", q["ccs"], q["srv_l"], 1.0, 1.0) + "\n"
+                      f"XRTA VSV V1_CM GND rhigh w=0.5e-6 l={q['rta'] / RSQ:.4g}e-6 m=1 b=0\n"
+                      f"XRTB vtrip V1_CM GND rhigh w=0.5e-6 l={q['rtb'] / RSQ:.4g}e-6 m=1 b=0\n.ends")
     if q["servo"] == "ideal":
         # integrate the stage-1 differential output; inject a bounded trim current into the CMFB reference
         t = t.replace(".ends", f"GSV GND VSV Vo_STG1 net2 {q['gsv']}\nCSV VSV GND {q['csv']}\nRSV VSV GND 1e9\n"
@@ -117,8 +157,10 @@ XMD VCTRLP VCTRLP VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m=1
         s1pair = (f"XMN1 net2 minus it1 VDD sg13_lv_pmos w={q['s1_w']}u l={q['s1_l']}u ng=1 m={q['s1_m']}\n"
                   f"XMN2 Vo_STG1 plus it1 VDD sg13_lv_pmos w={q['s1_w']}u l={q['s1_l']}u ng=1 m={q['s1_m']}")
     t = t.replace("{s1pair}", s1pair)
-    if q["reg"] == "ideal":
-        ota = f"GREG GND VCTRLN vgps irn {q['greg']}\nRREG VCTRLN GND 1e12"
+    if q["reg"] == "miller":
+        ota = miller("XRG", "vgps", "irn", "VCTRLN", q["ccr"], q["reg_l"], q["reg_w"], 1.0)
+    elif q["reg"] == "ideal":
+        ota = f"GREG GND VCTRLN vgps irn {q['greg']}\nRREG VCTRLN GND 1e9"
     else:
         ota = (f"XNM1 nota2 vgps inota GND sg13_lv_nmos w={q['ota_w']}u l={q['ota_l']}u ng=1 m={q['ota_m']}\n"
                f"XNM2 VCTRLN irn inota GND sg13_lv_nmos w={q['ota_w']}u l={q['ota_l']}u ng=1 m={q['ota_m']}\n"
@@ -140,6 +182,15 @@ def with_par(f):
     return g
 
 
+def ref_src(ptat):
+    """Reference current into IBIAS: constant 1 uA (False), PTAT (True or "ptat") or constant-gm
+    ("cgm": I = 1 uA * T/300.15 K * R0/R, R a dummy 100-kOhm rhigh at the same corner)."""
+    if ptat == "cgm":
+        return ("XRREF rref1 GND GND rhigh w=0.5e-6 l=33.7e-6 m=1 b=0\nVRREF rref1 GND 1\n"
+                "B_B VDD IBIAS I=1u*(temper+273.15)/300.15*1e5*abs(i(VRREF))")
+    return rp.ibias_src(bool(ptat))
+
+
 def tb(f, d, corner, temp, vdd=1.65, seed=None, models=None, tran=True, ac=True, ptat=False, extra_save=""):
     lo, hi = 0.725, 0.925
     return f"""* tb
@@ -147,13 +198,14 @@ def tb(f, d, corner, temp, vdd=1.65, seed=None, models=None, tran=True, ac=True,
 .include {f}
 {models or rp.models(corner)}.temp {temp}
 x1 VDD GND IBIAS VICM inp out RAMP_V2
-{rp.ibias_src(ptat)}
+{ref_src(ptat)}
 V1 VICM GND dc 0.825 ac 0 {f'pwl(0 {lo} 100n {lo} 101n {hi} 1.6u {hi})' if tran else ''}
 V2 VDD GND dc {vdd}
 C1 out GND 50p
 Vprobe2 probe inp 0
 Vprobe1 probe out dc 0 ac 1
 Iprobe1 GND probe dc 0 ac 0
+.nodeset v(x1.vctrln)=0.8 v(x1.vo_stg1)=0.72 v(x1.net2)=0.72 v(out)=0.825
 .control
 set wr_singlescale
 set wr_vecnames
@@ -204,7 +256,7 @@ CORNERS = (("mos_ss", -40), ("mos_sf", -40), ("mos_tt", -40), ("mos_tt", 27), ("
 def evaluate(p, name, par=True, corners=CORNERS, mc_n=0, mc_set="mismatch"):
     f = lib(p, name)
     fp = with_par(f) if par else f
-    ptat = bool(p.get("ptat"))
+    ptat = p.get("ptat")
     jobs = [(OUT / f"{name}_{c[4:]}_{t}", tb(fp, OUT / f"{name}_{c[4:]}_{t}", c, t, ptat=ptat)) for c, t in corners]
     jobs += [(OUT / f"{name}_mc{k}", tb(f, OUT / f"{name}_mc{k}", "mos_tt", 27, seed=k + 1, ptat=ptat,
                                         models=mcm.SETS[mc_set] if mc_set != "both" else BOTH,

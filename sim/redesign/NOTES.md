@@ -23,18 +23,32 @@ study that leads to v2. Run from this directory; outputs go to `sim/build/redesi
 3. **I_Q spread (σ of log10 I_Q ≈ 1.8)** comes only from stage 2 and its replica: the loop regulates the
    replica, not the signal path, and stage 2 amplifies the replica/signal-path trip mismatch ~20×.
 
-## v2 direction (so far)
+## v2 status (prototype `v2.py`, post-layout proxy: 12/10/8 fF on Vo_STG1/mp_dz/mn_dz)
 
-* PMOS input pair (lv PMOS matches 1.8× better per area; NMOS pair is in triode at FF 125 °C), NMOS loads,
-  PMOS-pair CMFB, stage-1 load 25 kΩ, tail 40 µA.
-* Direct deadzone regulation of the signal-path MP3 gate (sensed through 1 MΩ), replica removed:
-  I_Q σ/mean ≈ 17–20 % under mismatch instead of five decades.
-* PTAT reference: removes the cold-corner crossover rise (constant g_m3).
-* Offset servo: integrates the stage-1 differential output and trims the CMFB reference (bounded range):
-  systematic offset ≈ 0.1–0.4 mV, mismatch σ ≈ 1.6 mV where the trim range suffices.
-* Rejected: high stage-1 gain (A1 ≥ 10) — it shrinks the input-referred deadzone and creates a
-  large-signal limit cycle at cold corners even with 70° PM; CMFB referenced to a low-passed Vo_STG1 —
-  bistable (dead state).
+Main loop — done (configuration `chk.BASE` with `cmfb="diode"`):
 
-Still to do: transistor-level regulation OTA and servo (nA transconductors, integrating capacitors),
-trim range, full PVT/VDD/Monte Carlo verification, then schematic, layout, extraction and the report.
+| | Result |
+|:--|:--|
+| Topology | PMOS input pair 8 × 2.5/0.5 µm, NMOS loads, 25 kΩ rhigh loads, 40 µA tail (wide 4/1 tail devices), diode CMFB |
+| Stage 2 | MN3-gate inverter ×3; MP3-gate inverter 1 P : 6 N : 6 starve (L = 0.3 µm) |
+| Output | MN3 4 × 1.15/0.5 µm (was 2.3/1), MP3 unchanged |
+| Reference | constant-gm I_BIAS ∝ T/R (ideal input; tracks rhigh) — flattens the crossover over PVT |
+| UGF at TT | 18.1 MHz |
+| Worst PM / GM (7 corners) | 52° / 15.9 dB, no limit cycle for 10–200-mV steps |
+| Supply current | 153 µA |
+| Systematic offset | ≤ 0.9 mV over corners (with servo) |
+| Buffer gain error | 0.6–1.3 % at hot corners (v1: 1.46 %); not present in SC use (fixed input CM) |
+
+With ideal slow loops: I_Q P5–P95 1.9–2.3 µA under mismatch (σ ≈ 17–20 %), offset σ ≈ 1.6 mV.
+
+Open:
+* **Regulation integrator.** The transistor-level two-stage Miller integrator works, but the control path
+  VCTRLN → V_GP has a gain of ~12, so even a 0.33-µA integrator with 1 pF crosses over at 3–18 MHz
+  (unstable against the main loop). Needed: ≤ ~300 kHz → weaker control path (partial starve control) or a
+  tens-of-nA integrator.
+* **Offset servo** (transistor level): stable, 72–118 kHz, PM 86°; DC gain 37–45 dB (enough).
+* Then: VDD ± 5 %, Monte Carlo (process / mismatch / both), schematic, layout, extraction, report.
+
+Rejected on the way: high stage-1 gain (A1 ≥ 10, with or without cascode) — large-signal limit cycle at cold
+corners even with 70° PM; high-gain CMFB — its loop shares Vo_STG1 with the main loop and is unstable in every
+variant tried (net3 or net2 sensing, split load gates); CMFB referenced to a low-passed Vo_STG1 — bistable.
