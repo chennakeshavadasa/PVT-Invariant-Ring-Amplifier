@@ -1,7 +1,7 @@
 <h1 align="center">PVT-Tolerant Ring Amplifier with Deadzone Regulation in IHP SG13G2</h1>
 
 <p align="center">
-Nithin Purushothama &nbsp;·&nbsp; <a href="https://github.com/chennakeshavadasa">github.com/chennakeshavadasa</a><br>
+Nithin Purushothama &nbsp;·&nbsp; <a href="https://nithinpuru.com">nithinpuru.com</a><br>
 </p>
 
 <p align="center">
