@@ -29,12 +29,16 @@ K = os.path.join(os.environ.get("PDK_ROOT", os.path.expanduser("~/.ciel")), "ihp
 for p in (K + "/python", K + "/python/pycell4klayout-api/source/python"):
     sys.path.insert(0, p)
 
+import importlib  # noqa: E402
+
 import pya  # noqa: E402
 import sg13g2_pycell_lib  # noqa: E402,F401  (registers the SG13_dev PCell library)
-import ramp_lr_design as D  # noqa: E402
 
-OUT_GDS = os.path.join(HERE, "RAMP_LR.gds")
-OUT_JSON = os.path.join(HERE, "RAMP_LR_placement.json")
+# design module: RAMP_LR by default; klayout -b -r layout/gen_layout.py -rd design=ramp_v2_design
+D = importlib.import_module(globals().get("design") or os.environ.get("RAMP_DESIGN", "ramp_lr_design"))
+
+OUT_GDS = os.path.join(HERE, f"{D.TOP}.gds")
+OUT_JSON = os.path.join(HERE, f"{D.TOP}_placement.json")
 LY = pya.Layout()
 LY.dbu = 0.001
 TOP = LY.create_cell(D.TOP)
@@ -60,8 +64,14 @@ RES_PITCH = 0.80     # rhigh segments; implant and block layers merged over the 
 MIM_W = 36.5
 POWER = ("VDD", "GND")
 PORTS = D.CELLS[D.TOP]["ports"]
-LABELS = ("V1_CM", "VCTRLN", "VCTRLP", "Vo_STG1", "mn_dz", "mp_dz", "icm", "inota", "ipota", "irn", "irp", "it1")
-PORT_EDGE = dict(IBIAS="bottom", minus="bottom", plus="bottom", Vout="top")
+LABELS = getattr(D, "LABELS", ("V1_CM", "VCTRLN", "VCTRLP", "Vo_STG1", "mn_dz", "mp_dz", "icm", "inota", "ipota",
+                                "irn", "irp", "it1"))
+PORT_EDGE = getattr(D, "PORT_EDGE", dict(IBIAS="bottom", minus="bottom", plus="bottom", Vout="top"))
+# RAMP_V2: MIM capacitors with both plates on signal nets (Miller capacitors); RAMP_LR: two
+# decoupling capacitors with the top plate on a rail
+SIGNAL_MIMS = isinstance(getattr(D, "MIMS", None), list) and bool(D.MIMS) and isinstance(D.MIMS[0], dict)
+MIM_NETS = {m[k] for m in D.MIMS for k in ("top", "bottom")} if SIGNAL_MIMS else set()
+MIM_GAP = 6.0        # between the Metal5 plates of neighbouring MIMs: via stacks to TopMetal1
 # optional extra spacing for high-impedance nets: a track of their own with an empty track
 # on either side and twice the column spacing.  {"Vo_STG1", "mp_dz", "mn_dz"} cuts their
 # routing capacitance by 25-45 % and gains about 5 deg of post-layout phase margin, for 17 %
@@ -224,24 +234,29 @@ class Strip:
 
 class ResBlock:
     """rhigh segments side by side, ABBA..., all terminals at the heads that face the
-    source/drain channel of the row."""
+    source/drain channel of the row (a single-segment resistor has one terminal per head)."""
 
-    name = "rhigh"
-
-    def __init__(self):
-        self.cells = [pcell("rhigh", w=f"{D.RES['w']}u", l=f"{l}u") for l in D.RES["lengths"] * 2]
-        self.width = RES_PITCH * (len(D.RES["order"]) - 1) + 0.9 + 0.4
-        self.lmax = max(D.RES["lengths"])
+    def __init__(self, name="rhigh"):
+        self.name = name
+        self.spec = getattr(D, "RES_BLOCKS", {}).get(name) or D.RES
+        order, lengths = self.spec["order"], self.spec["lengths"]
+        self.lengths = lengths if len(lengths) == len(order) else lengths * (len(order) // len(lengths))
+        self.order = order
+        self.cells = [pcell("rhigh", w=f"{self.spec['w']}u", l=f"{l}u") for l in self.lengths]
+        self.width = RES_PITCH * (len(order) - 1) + 0.9 + 0.4
+        self.lmax = max(self.lengths)
 
     def head_nets(self):
         """(far-head net, near-head net) of each segment: series chain per resistor with
         both terminals on the near heads."""
-        out = [None] * len(D.RES["order"])
-        for r in dict.fromkeys(D.RES["order"]):
-            pos = [i for i, o in enumerate(D.RES["order"]) if o == r]
+        out = [None] * len(self.order)
+        for r in dict.fromkeys(self.order):
+            pos = [i for i, o in enumerate(self.order) if o == r]
             p, m = DEVS[r]["pins"]["P"], DEVS[r]["pins"]["M"]
             for k, i in enumerate(pos):
-                if k == 0:
+                if len(pos) == 1:
+                    near, far = p, m
+                elif k == 0:
                     near, far = p, f"{r}.n0"
                 elif k == len(pos) - 1:
                     near, far = m, f"{r}.n{k - 1}"
@@ -260,7 +275,7 @@ class ResBlock:
         s = -gside
         pins_near, pins_far, units = [], [], []
         x = x0 + 0.2
-        for cell, l, (far, near), ref in zip(self.cells, D.RES["lengths"] * 2, self.head_nets(), D.RES["order"]):
+        for cell, l, (far, near), ref in zip(self.cells, self.lengths, self.head_nets(), self.order):
             m1 = shapes_of(cell, "Metal1")       # [bottom head, top head]
             if s > 0:    # near heads on top: top-head M1 top edge on yl
                 y = yl - m1[1].top / 1000
@@ -278,7 +293,7 @@ class ResBlock:
         for k, b in lay.items():
             box(k, xa + b.left / 1000, g(y) + b.bottom / 1000, xb + b.right / 1000, g(y) + b.top / 1000)
         e = self.extent(gside)
-        PLACEMENT["strips"]["rhigh"] = dict(kind="rhigh", x0=round(x0, 3), x1=round(x0 + self.width, 3),
+        PLACEMENT["strips"][self.name] = dict(kind="rhigh", x0=round(x0, 3), x1=round(x0 + self.width, 3),
                                             y0=round(yl + e[0], 3), y1=round(yl + e[1], 3), fingers=units)
         return pins_near, pins_far
 
@@ -354,14 +369,15 @@ XL_COL, XR_COL = {}, {}
 def main():
     bands = []
     for names, gs in D.BANDS:
-        objs = [ResBlock() if n == "rhigh" else Strip(n) for n in names]
+        objs = [ResBlock(n) if n.startswith("rhigh") else Strip(n) for n in names]
         bands.append((objs, -1 if gs == "down" else 1))
 
     # 1) horizontal placement: strips left to right, power columns at both edges
     x_left = 3.0
     XL_COL.update(GND=1.0, VDD=2.0)
     row_w = max(sum(o.width for o in objs) + STRIP_GAP * (len(objs) - 1) for objs, _ in bands)
-    mim_w = 2 * (MIM_W + 1.2) + 1.0
+    mim_w = (sum(m["side"] + 1.2 for m in D.MIMS) + MIM_GAP * (len(D.MIMS) - 1) if SIGNAL_MIMS
+             else 2 * (MIM_W + 1.2) + 1.0)
     width = g(max(2 * x_left + row_w, mim_w + 2 * (x_left + 0.8)))
     XR_COL.update(VDD=width - 2.0, GND=width - 1.0)
     xs = []
@@ -418,7 +434,7 @@ def main():
     for n in POWER:
         cols[n] = [(XL_COL[n], 0, nch - 1), (XR_COL[n], 0, nch - 1)]
         occupied += [(XL_COL[n], -1, nch, n), (XR_COL[n], -1, nch, n)]
-    need = [n for n in where if n not in POWER and (len(where[n]) > 1 or n in PORTS)]
+    need = [n for n in where if n not in POWER and (len(where[n]) > 1 or n in PORTS or n in MIM_NETS)]
     need.sort(key=lambda n: -(max(where[n]) - min(where[n])))
     for n in need:
         lo, hi = min(where[n]), max(where[n])
@@ -559,6 +575,106 @@ def main():
         y1 = YL[bi] + max(o.extent(gs)[1] for o in ps) + ex
         box("NWell", x0, y0, x1, y1)
 
+    if SIGNAL_MIMS:
+        signal_mims(width, height, col_y)
+    else:
+        rail_mims(width, height, col_y)
+
+    LY.write(OUT_GDS)
+    import json
+    bb = TOP.bbox()
+    PLACEMENT["bbox"] = [bb.left / 1000, bb.bottom / 1000, bb.right / 1000, bb.top / 1000]
+    PLACEMENT["bands"] = [dict(strips=[o.name for o in objs], gates="down" if gs < 0 else "up",
+                               yl=round(YL[i], 3)) for i, (objs, gs) in enumerate(bands)]
+    with open(OUT_JSON, "w") as fh:
+        json.dump(PLACEMENT, fh, indent=1)
+    print(f"{D.TOP}: {bb.width() / 1000:.1f} um x {bb.height() / 1000:.1f} um "
+          f"({bb.width() * bb.height() / 1e6:.0f} um^2), {sum(ntr)} tracks in {nch} channels, "
+          f"{len([n for n in cols if n not in POWER])} Metal3 columns -> layout/{os.path.basename(OUT_GDS)}")
+
+
+def m4_path(pts, w=0.6):
+    """Metal4 wire through the points (horizontal/vertical segments)."""
+    for (xa, ya), (xb, yb) in zip(pts, pts[1:]):
+        box("Metal4", min(xa, xb) - w / 2, min(ya, yb) - w / 2, max(xa, xb) + w / 2, max(ya, yb) + w / 2)
+
+
+def signal_mims(width, height, col_y):
+    """MIM (Miller) capacitors side by side over the circuit, centred.  Bottom plate (Metal5):
+    from its net's Metal3 column by a Metal4 L to a Via4 stack inside the plate.  Top plate
+    (TopMetal1 of the PCell): from its column by a Metal4 L to a via stack in the gap between
+    the capacitors, then a TopMetal1 strap onto the plate.  Metal4 wires of different nets
+    keep 1.5 um apart."""
+    cells = [pcell("cmim", w=f"{m['side']}u", l=f"{m['side']}u") for m in D.MIMS]
+    total = sum(m["side"] + 1.2 for m in D.MIMS) + MIM_GAP * (len(D.MIMS) - 1)
+    x = g((width - total) / 2 + 0.6)
+    ytop = g((height + D.MIMS[0]["side"]) / 2)
+    wires = []          # (net, x0, y0, x1, y1) of the Metal4 segments
+    tm1_y = []          # y of the TopMetal1 via stacks
+
+    def segs(pts):
+        return [(min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1])) for a, b in zip(pts, pts[1:])]
+
+    def clear(net, pts):
+        for sx0, sy0, sx1, sy1 in segs(pts):
+            for n, wx0, wy0, wx1, wy1 in wires:
+                if n != net and sx0 - 1.5 < wx1 and wx0 < sx1 + 1.5 and sy0 - 1.5 < wy1 and wy0 < sy1 + 1.5:
+                    return False
+        return True
+
+    def route(net, col, target_x, target_y_range, via_top):
+        """Metal4 L from the column to (target_x, y) with y in target_y_range."""
+        xc, y0, y1 = col
+        lo, hi = target_y_range
+        mid = (lo + hi) / 2
+        span = [y0 + 0.5 + 0.25 * k for k in range(int((y1 - y0 - 1.0) / 0.25) + 1)] if y1 - y0 > 1.0 else [y0]
+        cands = sorted({g(y) for y in span}, key=lambda y: abs(y - mid))
+        for ya in cands:
+            for k in range(int((hi - lo) / 0.25) + 1):
+                yt = g(min(max(ya, lo), hi)) if k == 0 else g(lo + 0.25 * k)
+                pts = [(xc, ya), (target_x, ya), (target_x, yt)]
+                # TopMetal1 pads of different nets: 1.64 um space around the 2-um straps
+                if via_top == "TopMetal1" and any(abs(yt - u) < 4.0 for u in tm1_y):
+                    continue
+                if clear(net, pts):
+                    if via_top == "TopMetal1":
+                        tm1_y.append(yt)
+                    if y1 - y0 < 0.6:      # a column that touches one channel only: Metal3 min. area
+                        box("Metal3", xc - M3W / 2, ya - 0.4, xc + M3W / 2, ya + 0.4)
+                    via(xc, ya, "Metal3", "Metal4")
+                    m4_path(pts)
+                    via(target_x, yt, "Metal4", via_top)
+                    wires.extend((net, *sg) for sg in segs(pts))
+                    return yt
+        raise RuntimeError(f"no Metal4 route for the MIM net {net}: column {col}, target x {target_x}, y {target_y_range}, wires {wires}")
+
+    gaps = []
+    for i, (m, c) in enumerate(zip(D.MIMS, cells)):
+        side = m["side"]
+        cx0, cy0 = x, g(ytop - side)
+        cx1, cy1 = cx0 + side, ytop
+        place(c, cx0, cy0)
+        PLACEMENT["mims"].append(dict(ref=m["ref"], x0=round(cx0, 3), y0=round(cy0, 3), x1=round(cx1, 3),
+                                      y1=round(cy1, 3), top=m["top"], bottom=m["bottom"]))
+        m["_box"] = (cx0, cy0, cx1, cy1)
+        if i < len(D.MIMS) - 1:
+            gaps.append(cx1 + 0.6 + MIM_GAP / 2)
+        x = cx1 + 0.6 + MIM_GAP + 0.6
+    for i, m in enumerate(D.MIMS):
+        cx0, cy0, cx1, cy1 = m["_box"]
+        # bottom plate: Via4 stack inside the plate, near the column
+        xc = col_y[m["bottom"]][0][0]
+        route(m["bottom"], col_y[m["bottom"]][0], g(min(max(xc, cx0 + 1.5), cx1 - 1.5)),
+              (cy0 + 1.5, cy1 - 1.5), "Metal5")
+        # top plate: via stack in the neighbouring gap (left/right of its centre), TopMetal1 strap
+        gx = gaps[min(i, len(gaps) - 1)]
+        xg = g(gx - 1.2) if i < len(gaps) else g(gx + 1.2)
+        ys = route(m["top"], col_y[m["top"]][0], xg, (max(cy0, cy0) + 2.0, cy1 - 2.0), "TopMetal1")
+        xa, xb = (xg, cx0 + 2.0) if xg < cx0 else (cx1 - 2.0, xg)
+        box("TopMetal1", min(xa, xb) - 0.82, ys - 1.0, max(xa, xb) + 0.82, ys + 1.0)
+
+
+def rail_mims(width, height, col_y):
     # 8) MIM capacitors over the circuit; bottom plates to VCTRLN/VCTRLP through Metal4,
     #    top plates to the GND/VDD edge columns through TopMetal1 straps
     c = pcell("cmim", w=f"{MIM_W}u", l=f"{MIM_W}u")
@@ -586,18 +702,6 @@ def main():
         box("TopMetal1", xa, ys - 1.0, xb, ys + 1.0)
         via(xe, ys, "Metal3", "TopMetal1")
         box("Metal4", xe - 0.3, ys - 0.3, xe + 0.3, ys + 0.3)
-
-    LY.write(OUT_GDS)
-    import json
-    bb = TOP.bbox()
-    PLACEMENT["bbox"] = [bb.left / 1000, bb.bottom / 1000, bb.right / 1000, bb.top / 1000]
-    PLACEMENT["bands"] = [dict(strips=[o.name for o in objs], gates="down" if gs < 0 else "up",
-                               yl=round(YL[i], 3)) for i, (objs, gs) in enumerate(bands)]
-    with open(OUT_JSON, "w") as fh:
-        json.dump(PLACEMENT, fh, indent=1)
-    print(f"RAMP_LR: {bb.width() / 1000:.1f} um x {bb.height() / 1000:.1f} um "
-          f"({bb.width() * bb.height() / 1e6:.0f} um^2), {sum(ntr)} tracks in {nch} channels, "
-          f"{len([n for n in cols if n not in POWER])} Metal3 columns -> layout/{os.path.basename(OUT_GDS)}")
 
 
 YL = []

@@ -1,0 +1,1 @@
+RAMP_V2: 92.0 um x 67.6 um (6216 um^2), 53 tracks in 9 channels, 28 Metal3 columns -> layout/RAMP_V2.gds

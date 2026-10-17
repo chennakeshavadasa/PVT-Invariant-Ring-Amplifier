@@ -237,7 +237,7 @@ BANDS = [
     (["nlo_a", "nlo_b"], "down"),
     (["rg_in", "sv_in", "rhigh_a"], "up"),
     (["rhigh_b", "pmir", "p11"], "down"),
-    (["rhigh_c", "s1n", "s2n", "dzn", "out_n"], "down"),
+    (["rhigh_c", "s1n", "dzn", "s2n", "out_n"], "down"),
     (["s1p", "s2p", "out_p"], "up"),
     (["pt", "cm", "trp"], "down"),
 ]
