@@ -695,10 +695,10 @@ SS, −40 °C, TT, 27 °C and FF, 125 °C: (a)–(c) magnitude, (d)–(f) phase.
 post-layout netlist over process corner and temperature at 1.65 V (dotted: 45°).</p>
 
 **Which parasitics.** The sensitivity run of `sim/postlayout.py` removes the extracted capacitances of one net at a time
-(Fig. 31). The stage-1 output `Vo_STG1` dominates: it carries 44 fF — mostly the 180-µm Metal3 spine column
-and its coupling to the neighbouring columns `V1_CM` (8.9 fF), `VDD` (5.8 fF) and `VCTRLP` (3.8 fF) — on a node whose
-resistance is set by the 100-kΩ rhigh loads, so its pole drops by roughly a factor of four towards the unity-gain
-frequency. Removing it alone restores 20–24° of phase margin. The stage-2 outputs `mp_dz` and `mn_dz` (21 and 36 fF)
+(Fig. 31). The stage-1 output `Vo_STG1` dominates: it carries 44 fF — a 73-µm Metal3 spine column, Metal2 tracks
+in several channels and their coupling to other nets, mainly `V1_CM` (8.9 fF), `VDD` (5.8 fF) and `VCTRLP` (3.8 fF) — on
+a node whose resistance is set by the 100-kΩ rhigh loads, so its pole moves down towards the unity-gain frequency.
+Removing it alone restores 20–24° of phase margin. The stage-2 outputs `mp_dz` and `mn_dz` (21 and 36 fF)
 come second (+6–9°), the trip-point replica output third. The output node and the control voltages do not matter. One
 more coupling shows up in the SC test: the feedback input `plus` sits next to `Vout` in the spine with 7 fF between
 them, which adds to the 5-pF feedback capacitor and appears as a 0.14 % gain error (the 0.17 % floor in
