@@ -281,7 +281,19 @@ quit
     return f
 
 
+SPICEINIT = None
+
+
 def ngspice(deck: Path) -> bool:
+    """Run one deck.  The jobs already run in parallel, so each ngspice gets one thread
+    (set num_threads=1 in a .spiceinit next to the deck, which ngspice reads instead of
+    ~/.spiceinit); otherwise its OpenMP threads oversubscribe the cores."""
+    global SPICEINIT
+    if SPICEINIT is None:
+        home = Path.home() / ".spiceinit"
+        pdk = Path(os.environ.get("PDK_ROOT", "")) / "ihp-sg13g2" / "libs.tech" / "ngspice" / ".spiceinit"
+        SPICEINIT = (home.read_text() if home.exists() else pdk.read_text()) + "\nset num_threads=1\n"
+    (deck.parent / ".spiceinit").write_text(SPICEINIT)
     r = subprocess.run(["ngspice", "-b", deck.name], cwd=deck.parent, capture_output=True, text=True)
     (deck.parent / "ngspice.log").write_text(r.stdout + r.stderr)
     return r.returncode == 0 and "simulation(s) aborted" not in r.stdout + r.stderr
