@@ -165,7 +165,7 @@ def architecture():
     xbus = 112
     d.w((ox, oy), (xbus, oy))
     d.dot(xbus, oy)
-    d.t(96, oy + 3, "$V_{o1}$", va="bottom", it=True)
+    d.t(92, oy + 3, "$V_{o1}$", va="bottom", it=True)
     xa = 160
     gA, outA = starved_stack(d, xa, 288, "", "", "$V_{CTRLN}$", ("", "", "M$_{DZN}$"), "")
     gB, outB = starved_stack(d, xa, 140, "", "$V_{CTRLP}$", "", ("M$_{DZP}$", "", ""), "")
@@ -192,8 +192,8 @@ def architecture():
     d.dot(284, yo)
     d.cap(284, yo, 146, "$C_L$")
     d.gnd(284, 146)
-    d.group(124, 48, 236, 296, "")
-    d.t(180, 44, "stage 2 (deadzone)", va="top", size=8)
+    d.group(101, 48, 236, 296, "")
+    d.t(168, 44, "stage 2 (deadzone)", va="top", size=8)
     d.t(160, 26, "(a)", va="top")
 
     # ======================= (b) deadzone regulation =============================
