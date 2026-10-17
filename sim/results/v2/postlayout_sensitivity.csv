@@ -1,0 +1,13 @@
+removed,corner,temp_c,a0_db,ugf_hz,pm_deg,gm_db
+all parasitics removed,TT,27,123.573,1.43344e+07,72.2126,27.0045
+all parasitics removed,SS,-40,127.254,1.81128e+07,61.5688,16.0265
+"Vo_STG1, Vo1n (stage-1 outputs)",TT,27,123.55,1.29942e+07,69.373,25.0202
+"Vo_STG1, Vo1n (stage-1 outputs)",SS,-40,127.216,1.58952e+07,55.903,20.9043
+"mp_dz, mn_dz (stage-2 outputs)",TT,27,123.55,1.33485e+07,71.3318,24.2454
+"mp_dz, mn_dz (stage-2 outputs)",SS,-40,127.216,1.67196e+07,59.0611,19.3013
+"VCTRLP, VCTRLN",TT,27,123.55,1.29987e+07,66.1169,22.9969
+"VCTRLP, VCTRLN",SS,-40,127.216,1.53681e+07,51.731,19.5826
+integrator MIM nets,TT,27,123.565,1.30967e+07,65.9976,24.3541
+integrator MIM nets,SS,-40,127.241,1.57698e+07,50.0301,16.398
+Vout,TT,27,123.555,1.28294e+07,65.8639,24.3139
+Vout,SS,-40,127.229,1.53506e+07,50.4674,16.3153

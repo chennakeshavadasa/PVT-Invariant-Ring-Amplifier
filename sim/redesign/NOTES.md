@@ -1,6 +1,6 @@
 # RAMP v2 redesign — working notes
 
-Work in progress; the results in the main README still describe RAMP_LR (v1). These scripts are the
+The final design and its verification are in the main README (RAMP_V2, Sections V-VII). These scripts are the
 study that leads to v2. Run from this directory; outputs go to `sim/build/redesign*`.
 
 | Script | What it does |
@@ -39,7 +39,7 @@ Frozen v2 (`chk.BASE` + `v2_final.json`):
 | nA divider | I_BIAS -> 13 hv PMOS 1/1 (77 nA) -> 14 hv NMOS 0.3/2 units (5.5 nA each); hv units keep the ratio within +-8 % (lv units at FF 125 degC pass nA at V_GS = 45 mV and are off by 1.7x) |
 | Main loop (7 corners) | PM >= 54 deg, GM >= 14.6 dB, UGF 14.2 MHz TT (max 18.2), buffer ts(0.1 %) <= 119 ns, systematic offset <= 0.23 mV, 157 uA |
 | SC, 200-mV step | error at 250 ns <= 0.055 % (FF 125 degC: 0.13 %) |
-| Mismatch (TT) | offset sigma 1.38 mV (+-3 sigma = +-4.1 mV), I_Q sigma 9.9 % (before the final resizing; to be re-run) |
+| Monte Carlo (TT, 300 samples per set, xschem netlist) | offset sigma 1.53 mV (process + mismatch, +-3 sigma -4.4 ... +4.8 mV), I_Q sigma/mean 15 %, PM >= 64.8 deg |
 | Start-up | the slow loops settle in about 1 ms from power-up |
 
 Why the slow loops are slow: a continuous-time loop that moves the offset or the deadzone integrates the transient
