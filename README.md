@@ -184,11 +184,13 @@ ringamp settling in pipelined ADCs is given in [13].
 <i>V<sub>GP</sub></i>, (c) output current, (d) output voltage, divided into initial RC settling, large-signal settling and
 small-signal linear settling. Reproduced from [2, Fig. 2.12] (the thesis caption labels the panels a, b, b, c).</p>
 
-<p align="center"><img src="docs/figures/results/three_phase.gif" width="62%" alt="animation of the three settling phases"></p>
-<p align="center"><b>Fig. 4.</b> The three phases in the layout-ready IHP design (TT, 27 °C, 200-mV step,
-50 pF): a cursor walks through the simulated output, the stage-3 gate voltages and the load current
-<i>C<sub>L</sub></i>·d<i>V<sub>out</sub></i>/d<i>t</i>. The phase boundaries are detected from the data (a gate within
-0.25 V of a rail; |<i>I<sub>out</sub></i>| &gt; 20 <i>I<sub>Q</sub></i>).</p>
+<p align="center"><img src="docs/figures/results/three_phase.gif" width="100%" alt="animation of the three settling phases"></p>
+<p align="center"><b>Fig. 4.</b> The three phases in the layout-ready IHP design (TT, 27 °C, 200-mV buffer step,
+<i>C<sub>L</sub></i> = 50 pF), animated from the simulation. Left: output, stage-3 gate voltages and the currents
+of MP3 and of <i>C<sub>L</sub></i>, traced in time and shaded by phase. Right: the output stage at the same instant,
+with the device currents (shading ∝ log current) and the direction and size of the current into <i>C<sub>L</sub></i>.
+The phase boundaries are detected from the data: a gate within 0.25 V of a rail (RC), |<i>I<sub>C<sub>L</sub></sub></i>| above
+20 <i>I<sub>Q</sub></i> (large signal), then until the output is within 0.1 % (small signal).</p>
 
 ### C. Small-signal model and design equations
 
@@ -758,6 +760,19 @@ SS, −40 °C the 38° of the schematic become 16° and the buffer oscillates af
 (Fig. 32). The SC amplifier, whose feedback factor is 0.5, settles at every point, and its static gain error is
 that of the schematic: the feedback input `plus` and the output no longer couple (below the 0.01-fF extraction
 threshold; 7 fF in the first layout, which showed up as a 0.14 % gain error).
+
+**Why the buffer oscillates at SS, −40 °C.** The post-layout loop is stable in the small-signal sense but has almost no
+reserve: 16° of phase margin and 4.8 dB of gain margin, with the loop phase crossing −180° at 36 MHz (schematic: 38°,
+15 dB, 84 MHz). A 2-mV step therefore decays. Any step of 10 mV or more ends in the same sustained oscillation, 64 mV
+peak to peak at 43 MHz, whatever the step size — a limit cycle. In each cycle the stage-3 gates leave the deadzone and
+MP3 conducts up to 430 µA, a hundred times $I_Q$; the output-stage transconductance, and with it the loop gain near
+the crossover, rises by more than the 4.8 dB of gain margin, so the oscillation sustains itself at an amplitude where
+the average large-signal gain is just one. This is the cold, slow corner because the regulated output stage keeps its
+$g_m$ while the stage gains $A_1A_2$ are highest there, which already gives the schematic its lowest margin (Fig. 15).
+Rerunning the 200-mV step with the parasitic capacitances of one net group removed shows which ones matter: without
+those of `Vo_STG1` (19 fF) the oscillation disappears, without any other group it persists (55–62 mV). A stage-1
+output that tolerates its routing capacitance, or large-signal damping as in [2, Ch. 4], [14], is therefore required;
+the buffer configuration, with feedback factor 1, is the worst case for both.
 
 <p align="center"><img src="docs/figures/results/fig_postlayout_bode.png" width="100%" alt="schematic versus post-layout loop gain"></p>
 <p align="center"><b>Fig. 31.</b> Loop gain of the buffer, schematic (blue) and post-layout (orange, dashed), at

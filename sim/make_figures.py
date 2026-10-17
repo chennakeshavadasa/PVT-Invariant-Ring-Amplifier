@@ -65,6 +65,12 @@ def pick(design="RAMP_LR", **kw):
     return [r for r in ROWS if r["design"] == design and all(r[k] == v for k, v in kw.items())]
 
 
+def top_legend(fig, handles, labels, ncol, y=1.0):
+    """Legend above all axes (never on the data)."""
+    fig.legend(handles, labels, loc="lower center", ncol=ncol, bbox_to_anchor=(0.5, y),
+               columnspacing=1.2, handlelength=2.2)
+
+
 def panel(ax, s):
     ax.text(0.015, 0.97, s, transform=ax.transAxes, va="top", ha="left",
             bbox=dict(fc="white", ec="none", pad=1.0))
@@ -104,10 +110,10 @@ def fig_loopgain():
     a.set(xlabel="Frequency (Hz)", ylabel="Loop gain $|T|$ (dB)", xlim=(1, 1e10), ylim=(-100, 100))
     b.set(xlabel="Frequency (Hz)", ylabel="Phase of $T$ (deg)", xlim=(1, 1e10), ylim=(-360, 10))
     b.set_yticks([-360, -270, -180, -90, 0])
-    a.legend(loc="lower left")
     panel(a, "(a)")
-    panel(b, "(b)")
+    b.text(0.985, 0.97, "(b)", transform=b.transAxes, va="top", ha="right")
     fig.tight_layout(w_pad=1.5)
+    top_legend(fig, *a.get_legend_handles_labels(), ncol=2)
     save(fig, "fig_loopgain.png")
 
 
@@ -128,13 +134,13 @@ def fig_iq_temperature():
         col, ls, mk = CSTYLE[c]
         ax.plot(d["temp-sweep"], d["v(x1.vctrlp)"], ls, color=col, marker=mk, ms=3.5, markevery=6, mfc="white")
         ax.plot(d["temp-sweep"], d["v(x1.vctrln)"], ls, color=col, marker=mk, ms=3.5, markevery=6, mfc=col)
-    ax.set(xlabel="Temperature (°C)", ylabel="Control voltage (V)", xlim=(-40, 125))
+    ax.set(xlabel="Temperature (°C)", ylabel="Control voltage (V)", xlim=(-40, 125), ylim=(0.72, 0.97))
     ax.set_xticks([-40, 0, 40, 80, 125])
     ax.set_title("regulated $V_{CTRLP}$ (open), $V_{CTRLN}$ (filled)")
-    axs[0].legend(loc="lower right", ncol=2, columnspacing=0.8, handlelength=1.8)
     for ax, s in zip(axs, "abc"):
         panel(ax, f"({s})")
     fig.tight_layout(w_pad=1.0)
+    top_legend(fig, *axs[0].get_legend_handles_labels(), ncol=5)
     save(fig, "fig_iq_temperature.png")
 
 
@@ -228,10 +234,10 @@ def fig_small_step():
     b.set(xlabel="Time after the step (ns)", ylabel="Normalised output", xlim=(-50, 2000), ylim=(-0.05, 1.25))
     a.set_title("200 mV input step")
     b.set_title("4 mV input step")
-    b.legend(loc="lower right")
     panel(a, "(a)")
     panel(b, "(b)")
     fig.tight_layout(w_pad=1.5)
+    top_legend(fig, *b.get_legend_handles_labels(), ncol=3)
     save(fig, "fig_sc_steps.png")
 
 
@@ -267,11 +273,9 @@ def fig_three_phase():
     axs[0].plot(t, vin, ":", color=GREY, label="$V_{in}$")
     axs[0].plot(t, v, "-", color=BLUE, label="$V_{out}$")
     axs[0].set_ylabel("Voltage (V)")
-    axs[0].legend(loc="center right")
     axs[1].plot(t, vgp, "-", color=INK, label="$V_{GP}$ (MP3 gate)")
     axs[1].plot(t, vgn, "--", color=ORANGE, label="$V_{GN}$ (MN3 gate)")
     axs[1].set(ylabel="Voltage (V)", ylim=(-0.1, 1.75))
-    axs[1].legend(loc="lower right")
     axs[2].plot(t, iout, "-", color=BLUE)
     axs[2].set(ylabel="$I_{out}=C_L\\,dV_{out}/dt$ (mA)", xlabel="Time after the input step (ns)")
     for ax in axs:
@@ -284,6 +288,9 @@ def fig_three_phase():
     for ax, s, y in zip(axs, "abc", (0.06, 0.94, 0.06)):
         ax.text(0.985, y, f"({s})", transform=ax.transAxes, ha="right", va="bottom" if y < 0.5 else "top")
     fig.tight_layout(h_pad=0.4)
+    h0, l0 = axs[0].get_legend_handles_labels()
+    h1, l1 = axs[1].get_legend_handles_labels()
+    fig.legend(h0 + h1, l0 + l1, loc="upper center", ncol=2, bbox_to_anchor=(0.55, 0.0), handlelength=2.0)
     save(fig, "fig_three_phase.png")
     return t, v, vin, vgp, vgn, iout, t1, t2
 
@@ -306,9 +313,6 @@ def phase_panels(axs, bias, corner, temp, show_legend=False):
     iq = pick(bias=bias, corner=corner.upper(), temp_c=temp, vdd=1.65)[0]["iq_ua"]
     axs[2].text(0.97, 0.93, f"$I_Q$ = {iq:.3g} µA\n0.1 % at {ts:.0f} ns", transform=axs[2].transAxes,
                 ha="right", va="top", bbox=dict(fc="white", ec="none", pad=1.0))
-    if show_legend:
-        axs[0].legend(loc="lower right", handlelength=1.6)
-        axs[1].legend(loc="upper right", ncol=2, handlelength=1.6, columnspacing=0.8)
     return t1, t2, ts
 
 
@@ -330,11 +334,14 @@ def fig_three_phase_corners():
         axs[0, j].set_title(f"{c.upper()}, {t} °C".replace("-", "−"))
         axs[-1, j].set(xlabel="Time after the input step (ns)", xlim=(-5, 120))
     for n, ax in enumerate(axs.flat):
-        ax.text(0.03, 0.93, f"({chr(97 + n)})", transform=ax.transAxes, ha="left", va="top")
+        ax.text(0.97, 0.06, f"({chr(97 + n)})", transform=ax.transAxes, ha="right", va="bottom")
     fig.tight_layout(h_pad=0.25, w_pad=0.4, rect=(0.025, 0, 1, 0.965))
     h = [mpl.patches.Patch(color=c) for c in PHASE_TINT]
-    fig.legend(h, ["RC phase (stage-3 device fully on)", "large-signal phase", "small-signal phase to 0.1 %"],
-               loc="lower center", ncol=3, bbox_to_anchor=(0.5, 0.965), handlelength=1.4)
+    h += [mpl.lines.Line2D([], [], color=GREY, ls=":"), mpl.lines.Line2D([], [], color=INK, ls="-"),
+          mpl.lines.Line2D([], [], color=GREY, ls="--")]
+    fig.legend(h, ["RC phase (stage-3 device fully on)", "large-signal phase", "small-signal phase to 0.1 %",
+                   "$V_{in}$", "$V_{GP}$ (MP3 gate)", "$V_{GN}$ (MN3 gate)"],
+               loc="lower center", ncol=3, bbox_to_anchor=(0.5, 0.965), handlelength=1.6)
     row_label(fig, axs[0:3, 0], BIAS_ROW["fix"])
     row_label(fig, axs[3:6, 0], BIAS_ROW["reg"])
     save(fig, "fig_three_phase_corners.png")
@@ -419,8 +426,8 @@ def fig_postlayout_bode():
     axs[0, 0].set_ylabel("$|T|$ (dB)")
     axs[1, 0].set_ylabel("$\\angle T$ (deg)")
     for n, ax in enumerate(axs.flat):
-        ax.text(0.03, 0.05 if n < 3 else 0.30, f"({chr(97 + n)})", transform=ax.transAxes, ha="left",
-                va="bottom" if n < 3 else "top")
+        ax.text(0.03 if n < 3 else 0.97, 0.05 if n < 3 else 0.95, f"({chr(97 + n)})", transform=ax.transAxes,
+                ha="left" if n < 3 else "right", va="bottom" if n < 3 else "top")
     fig.tight_layout(h_pad=0.3, w_pad=0.4, rect=(0, 0, 1, 0.94))
     h, l = axs[0, 0].get_legend_handles_labels()
     fig.legend(h, l, loc="lower center", ncol=2, bbox_to_anchor=(0.5, 0.94))
@@ -593,50 +600,165 @@ def fig_mc_waves():
                        bbox=dict(fc="white", ec="none", pad=1.0))
     axs[1, 0].set(xlabel="Frequency (Hz)", xlim=(10, 1e9))
     axs[1, 1].set(xlabel="Time after the 4-mV step (ns)", xlim=(-20, 1000))
-    axs[0, 0].legend(loc="lower left")
+
     for ax, sl in zip(axs.flat, "abcd"):
         left = ax in axs[:, 0]
         ax.text(0.03 if left else 0.97, 0.95, f"({sl})", transform=ax.transAxes, ha="left" if left else "right",
                 va="top", bbox=dict(fc="white", ec="none", pad=1.0))
     fig.tight_layout(h_pad=0.4, w_pad=1.0)
+    top_legend(fig, [mpl.lines.Line2D([], [], color=INK, lw=1.0), mpl.lines.Line2D([], [], color=ORANGE, lw=0.8),
+                     mpl.lines.Line2D([], [], color=BLUE, lw=0.8)],
+               ["nominal (TT, 27 °C)", "samples, fixed bias", "samples, deadzone regulation"], ncol=3)
     save(fig, "fig_mc_waves.png")
 
 
 def gif_three_phase():
-    t, v, vin, vgp, vgn, iout, t1, t2, _ = three_phase_data()
-    fig, axs = plt.subplots(3, 1, figsize=(4.6, 4.6), sharex=True, dpi=110)
-    axs[0].plot(t, vin, ":", color=GREY)
-    axs[0].plot(t, v, "-", color=BLUE)
-    axs[1].plot(t, vgp, "-", color=INK)
-    axs[1].plot(t, vgn, "--", color=ORANGE)
-    axs[2].plot(t, iout, "-", color=BLUE)
-    axs[0].set_ylabel("$V_{in}$, $V_{out}$ (V)")
-    axs[1].set_ylabel("$V_{GP}$, $V_{GN}$ (V)")
-    axs[2].set_ylabel("$I_{out}$ (mA)")
-    axs[2].set_xlabel("Time after the input step (ns)")
+    """Animation of the 200-mV buffer step (TT, 27 degC): the waveforms are traced in time,
+    the three settling phases are shaded as they happen, and a live view of the output
+    stage shows which device conducts and how much current flows into C_L."""
+    from matplotlib.patches import Circle, FancyArrow, Rectangle
+    t, v, vin, vgp, vgn, iout, t1, t2, ts = three_phase_data()
+    d = read(RES / "tran_reg_tt_27.dat")
+    m = (d["time"] >= 95e-9) & (d["time"] <= 595e-9)
+    ip = d["i(v.x1.viq)"][m] * 1e6                 # MP3 current (uA)
+    io = iout * 1e3                                 # C_L current (uA)
+    i_n = np.maximum(ip - io, 0.0)                  # MN3 current by KCL at V_out (uA)
+    T_END = 100.0
+    keep = t <= T_END
+    t, v, vin, vgp, vgn, io, ip, i_n = (x[keep] for x in (t, v, vin, vgp, vgn, io, ip, i_n))
+    phases = [(0, t1, "RC phase", "Stage 2 pulls the MP3 gate to the\nrail: MP3 is fully on and charges\n"
+                                  "$C_L$ with about 0.5 mA."),
+              (t1, t2, "Large-signal phase", "The gates leave the rails; the\noutput current falls steeply and\n"
+                                             "overshoots slightly."),
+              (t2, ts, "Small-signal phase", "Both gates are in the deadzone;\nthe loop settles linearly with\n"
+                                             "only $I_Q$ in the output stage."),
+              (ts, T_END, "Settled", "Within 0.1 % of the final value;\nMP3 and MN3 carry only the\n"
+                                     "quiescent current $I_Q$ = 4.2 µA.")]
+
+    mpl.rcParams.update({"font.size": 10, "axes.labelsize": 10, "legend.fontsize": 10,
+                         "xtick.labelsize": 10, "ytick.labelsize": 10})
+    fig = plt.figure(figsize=(9.6, 5.4), dpi=120)
+    gs = fig.add_gridspec(3, 2, width_ratios=(1.9, 1.0), hspace=0.18, wspace=0.04,
+                          left=0.08, right=0.985, top=0.83, bottom=0.10)
+    axs = [fig.add_subplot(gs[i, 0]) for i in range(3)]
+    for ax in axs[1:]:
+        ax.sharex(axs[0])
+    sch = fig.add_subplot(gs[:, 1])
+    fig.text(0.5, 0.975, "Ring amplifier: the three settling phases of a 200-mV step (TT, 27 °C, $C_L$ = 50 pF)",
+             ha="center", va="top", fontsize=11)
+    # static axes setup
+    axs[0].set(ylabel="Voltage (V)", ylim=(0.70, 0.96))
+    axs[1].set(ylabel="Gates (V)", ylim=(-0.1, 1.75))
+    axs[2].set(ylabel="Current (µA)", ylim=(-150, 650), xlabel="Time after the input step (ns)")
     for ax in axs:
-        ax.set_xlim(-5, 120)
-    cur = [ax.axvline(0, color=INK, lw=0.8) for ax in axs]
-    label = axs[0].text(0.98, 0.08, "", transform=axs[0].transAxes, ha="right", va="bottom",
-                        bbox=dict(fc="white", ec="#bdbdbd", pad=2))
-    fig.suptitle("Ring amplifier step response: three settling phases (TT, 27 °C)", fontsize=9)
-    fig.tight_layout()
-    frames = np.linspace(-5, 120, 90)
+        ax.set_xlim(-5, T_END)
+    for ax in axs[:2]:
+        plt.setp(ax.get_xticklabels(), visible=False)
+    lines = dict(vin=axs[0].plot([], [], ":", color=GREY, lw=1.2)[0],
+                 vout=axs[0].plot([], [], "-", color=BLUE, lw=1.6)[0],
+                 vgp=axs[1].plot([], [], "-", color=INK, lw=1.4)[0],
+                 vgn=axs[1].plot([], [], "--", color=ORANGE, lw=1.4)[0],
+                 io=axs[2].plot([], [], "-", color=BLUE, lw=1.6)[0],
+                 ip=axs[2].plot([], [], "-", color=INK, lw=1.0, alpha=0.6)[0])
+    dots = [ax.plot([], [], "o", ms=5, color=c, zorder=6)[0] for ax, c in
+            ((axs[0], BLUE), (axs[1], INK), (axs[1], ORANGE), (axs[2], BLUE))]
+    shades = [[ax.axvspan(0, 0, color=PHASE_TINT[min(k, 2)], lw=0, alpha=1.0 if k < 3 else 0.0) for k in range(4)]
+              for ax in axs]
+    h = [mpl.lines.Line2D([], [], color=GREY, ls=":", lw=1.2), mpl.lines.Line2D([], [], color=BLUE, lw=1.6),
+         mpl.lines.Line2D([], [], color=INK, lw=1.4), mpl.lines.Line2D([], [], color=ORANGE, ls="--", lw=1.4),
+         mpl.lines.Line2D([], [], color=INK, lw=1.0, alpha=0.6)]
+    fig.legend(h, ["$V_{in}$", "$V_{out}$, $I_{C_L}$", "$V_{GP}$ (MP3 gate)", "$V_{GN}$ (MN3 gate)",
+                   "$I_{MP3}$"], loc="lower center", ncol=5, bbox_to_anchor=(0.5, 0.855), frameon=False,
+               handlelength=2.0, columnspacing=1.4)
+    # output-stage view
+    sch.set_xlim(0.6, 10.6)
+    sch.set_ylim(0, 14.2)
+    sch.axis("off")
+    k = dict(color=INK, lw=1.4, solid_capstyle="round")
+    sch.plot([3.2, 6.2], [9.6, 9.6], **k)
+    sch.text(4.7, 9.75, "$V_{DD}$", ha="center", va="bottom")
+    sch.plot([4.7, 4.7], [9.6, 8.6], **k)
+    sch.plot([4.7, 4.7], [6.6, 4.4], **k)
+    sch.plot([4.7, 4.7], [2.4, 1.4], **k)
+    for yy in (1.4, 1.15, 0.9):
+        w = {1.4: 0.6, 1.15: 0.38, 0.9: 0.16}[yy]
+        sch.plot([4.7 - w, 4.7 + w], [yy, yy], **k)
+    sch.plot([4.7, 8.2], [5.5, 5.5], **k)
+    sch.add_patch(Circle((4.7, 5.5), 0.09, color=INK, zorder=5))
+    sch.text(6.2, 5.62, "$V_{out}$", ha="center", va="bottom")
+    sch.plot([8.2, 8.2], [5.5, 4.0], **k)
+    sch.plot([7.6, 8.8], [4.0, 4.0], color=INK, lw=2.2)
+    sch.plot([7.6, 8.8], [3.6, 3.6], color=INK, lw=2.2)
+    sch.plot([8.2, 8.2], [3.6, 2.6], **k)
+    for yy, w in ((2.6, 0.5), (2.38, 0.32), (2.16, 0.14)):
+        sch.plot([8.2 - w, 8.2 + w], [yy, yy], **k)
+    sch.text(9.0, 3.8, "$C_L$", ha="left", va="center")
+    dev = {}
+    for name, y0, lab in (("MP3", 6.6, "MP3"), ("MN3", 2.4, "MN3")):
+        dev[name] = Rectangle((4.1, y0), 1.2, 2.0, fc="white", ec=INK, lw=1.4, zorder=3)
+        sch.add_patch(dev[name])
+        sch.text(4.7, y0 + 1.0, lab, ha="center", va="center", zorder=4)
+        sch.plot([2.7, 4.1], [y0 + 1.0, y0 + 1.0], **k)
+    sch.text(2.6, 7.6, "$V_{GP}$", ha="right", va="center")
+    sch.text(2.6, 3.4, "$V_{GN}$", ha="right", va="center")
+    val_p = sch.text(5.5, 8.15, "", ha="left", va="center", fontsize=10)
+    val_n = sch.text(5.5, 2.85, "", ha="left", va="center", fontsize=10)
+    val_c = sch.text(7.25, 4.6, "", ha="right", va="center", fontsize=10, color=BLUE)
+    arrow = [None]
+    title = sch.text(5.6, 14.1, "", ha="center", va="top", fontsize=11, fontweight="bold")
+    expl = sch.text(5.6, 13.15, "", ha="center", va="top", fontsize=10, linespacing=1.25)
+    on_col = "#f6c3a5"
+
+    def shade_alpha(i_ua):
+        return min(1.0, max(0.0, np.log10(max(i_ua, 1e-3) / 4.2) / np.log10(600 / 4.2)))
+
+    frames = list(np.linspace(-5, T_END, 150)) + [T_END] * 18      # hold the last frame
 
     def upd(x):
-        for c in cur:
-            c.set_xdata([x, x])
-        phase = "RC settling: MP3 fully on" if 0 <= x < t1 else \
-            "large-signal settling" if t1 <= x < t2 else \
-            "small-signal settling at $I_Q$" if x >= t2 else "before the step: $I_Q$ only"
-        label.set_text(phase)
-        return cur + [label]
+        sel = t <= x
+        lines["vin"].set_data(t[sel], vin[sel])
+        lines["vout"].set_data(t[sel], v[sel])
+        lines["vgp"].set_data(t[sel], vgp[sel])
+        lines["vgn"].set_data(t[sel], vgn[sel])
+        lines["io"].set_data(t[sel], io[sel])
+        lines["ip"].set_data(t[sel], ip[sel])
+        j = max(int(np.searchsorted(t, x)) - 1, 0)
+        for dot, yy in zip(dots, (v[j], vgp[j], vgn[j], io[j])):
+            dot.set_data([t[j]], [yy])
+        for ax_sh in shades:
+            for kk, (a0, a1, _, _) in enumerate(phases[:3]):
+                lo, hi = a0, min(a1, x)
+                ax_sh[kk].set_x(lo)
+                ax_sh[kk].set_width(max(hi - lo, 0.0))
+        ph = next((p for p in phases if p[0] <= x < p[1]), phases[-1]) if x >= 0 else \
+            (None, None, "Before the step", "The amplifier is at rest: both gates sit in the deadzone and only\n"
+                                            "$I_Q$ = 4.2 µA flows through MP3 and MN3.")
+        title.set_text(ph[2])
+        expl.set_text(ph[3])
+        for name, cur in (("MP3", ip[j]), ("MN3", i_n[j])):
+            a_ = shade_alpha(abs(cur))
+            col = np.array(mpl.colors.to_rgb(on_col)) * a_ + np.ones(3) * (1 - a_)
+            dev[name].set_facecolor(col)
+        val_p.set_text(f"{ip[j]:6.0f} µA" if abs(ip[j]) >= 10 else f"{ip[j]:6.1f} µA")
+        val_n.set_text(f"{i_n[j]:6.0f} µA" if abs(i_n[j]) >= 10 else f"{i_n[j]:6.1f} µA")
+        val_c.set_text(f"{io[j]:+.0f} µA" if abs(io[j]) >= 10 else f"{io[j]:+.1f} µA")
+        if arrow[0] is not None:
+            arrow[0].remove()
+            arrow[0] = None
+        if abs(io[j]) > 5:            # on the wire between V_out and C_L, length ~ |I_CL|
+            ln = 0.45 + 0.75 * min(abs(io[j]) / 550, 1.0)
+            y0_ = 5.25 if io[j] > 0 else 4.15
+            arrow[0] = sch.add_patch(FancyArrow(7.75, y0_, 0, -ln if io[j] > 0 else ln, width=0.08,
+                                                head_width=0.35, head_length=0.3, color=BLUE, zorder=6,
+                                                length_includes_head=True))
+        return []
 
     ani = animation.FuncAnimation(fig, upd, frames=frames, blit=False)
-    ani.save(OUT / "three_phase.gif", writer=animation.PillowWriter(fps=12))
+    ani.save(OUT / "three_phase.gif", writer=animation.PillowWriter(fps=15), dpi=120)
     plt.close(fig)
+    mpl.rcParams.update({"font.size": 9, "axes.labelsize": 9, "legend.fontsize": 9,
+                         "xtick.labelsize": 9, "ytick.labelsize": 9})
     print("wrote", OUT / "three_phase.gif")
-
 
 def fig_power():
     d = read(RES / "power_tt_27.dat")
@@ -672,7 +794,8 @@ def fig_psrr():
         ax.semilogx(d["frequency"], -20 * np.log10(a), ls, color=col, marker=mk, ms=3.5, markevery=40,
                     mfc="white", label=c)
     ax.set(xlabel="Frequency (Hz)", ylabel="PSRR (dB)", xlim=(1, 1e10), ylim=(0, 110))
-    ax.legend(loc="lower left", ncol=3, columnspacing=0.8)
+    fig.tight_layout()
+    top_legend(fig, *ax.get_legend_handles_labels(), ncol=5)
     save(fig, "fig_psrr.png")
 
 
@@ -735,8 +858,9 @@ def fig_bode_corners():
         axs[-1, j].set(xlabel="Frequency (Hz)", xlim=(10, 1e9))
         axs[-1, j].set_xticks([1e1, 1e3, 1e5, 1e7, 1e9])
     for k, ax in enumerate(axs.flat):
-        ax.text(0.03, 0.05 if k // 3 % 2 == 0 else 0.30, f"({'abcdefghijkl'[k]})", transform=ax.transAxes,
-                ha="left", va="bottom" if k // 3 % 2 == 0 else "top")
+        mag = k // 3 % 2 == 0
+        ax.text(0.03 if mag else 0.97, 0.05 if mag else 0.95, f"({'abcdefghijkl'[k]})", transform=ax.transAxes,
+                ha="left" if mag else "right", va="bottom" if mag else "top")
     fig.tight_layout(h_pad=0.3, w_pad=0.4, rect=(0.025, 0, 1, 0.965))
     corner_legend(fig, 0.965)
     row_label(fig, axs[0:2, 0], BIAS_ROW["fix"])
@@ -777,8 +901,7 @@ def fig_step_corners(k, name, xlim):
         axs[0, j].set_title(f"{t} °C".replace("-", "\u2212"))
         axs[-1, j].set(xlabel="Time after the step (ns)", xlim=xlim)
     for n, ax in enumerate(axs.flat):
-        ax.text(0.03, 0.95, f"({'abcdefghijkl'[n]})", transform=ax.transAxes, ha="left", va="top",
-                bbox=dict(fc="white", ec="none", pad=1.0))
+        ax.text(0.97, 0.95, f"({'abcdefghijkl'[n]})", transform=ax.transAxes, ha="right", va="top")
     fig.tight_layout(h_pad=0.3, w_pad=0.4, rect=(0.025, 0, 1, 0.965))
     corner_legend(fig, 0.965, extra=(("0.1 % error", dict(color=INK, lw=0.8, ls=":")),
                                      ("250 ns", dict(color=GREY, lw=0.6, ls="--"))))
