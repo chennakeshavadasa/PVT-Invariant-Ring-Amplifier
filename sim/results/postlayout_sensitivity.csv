@@ -1,0 +1,13 @@
+removed,corner,temp_c,a0_db,ugf_hz,pm_deg,gm_db
+all parasitics removed,TT,27,77.3328,1.88649e+07,61.6102,24.8391
+all parasitics removed,SS,-40,83.1235,3.12574e+07,38.1737,15.7767
+Vo_STG1 (stage-1 output),TT,27,77.3328,1.65184e+07,53.6071,26.2464
+Vo_STG1 (stage-1 output),SS,-40,83.1235,2.45841e+07,27.3741,21.8226
+"mp_dz, mn_dz (stage-2 outputs)",TT,27,77.3328,1.7411e+07,42.9626,13.3353
+"mp_dz, mn_dz (stage-2 outputs)",SS,-40,83.1235,2.7118e+07,9.95329,2.67937
+V1_CM (trip-point replica),TT,27,77.3328,1.58495e+07,37.6745,11.3527
+V1_CM (trip-point replica),SS,-40,83.1235,2.34761e+07,7.09964,2.12455
+"VCTRLP, VCTRLN",TT,27,77.3328,1.55714e+07,35.4565,10.6088
+"VCTRLP, VCTRLN",SS,-40,83.1235,2.29696e+07,5.12733,1.5231
+Vout,TT,27,77.3328,1.54754e+07,34.3835,10.2004
+Vout,SS,-40,83.1235,2.28215e+07,3.7966,1.10917
