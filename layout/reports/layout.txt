@@ -1,1 +1,1 @@
-RAMP_LR: 109.0 um x 182.7 um (19921 um^2), 27 spine columns, 460 stubs -> layout/RAMP_LR.gds
+RAMP_LR: 83.1 um x 44.0 um (3655 um^2), 42 tracks in 8 channels, 24 Metal3 columns -> layout/RAMP_LR.gds

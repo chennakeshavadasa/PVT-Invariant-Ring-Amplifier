@@ -171,82 +171,84 @@ CELLS = {
 }
 
 # --------------------------------------------------------------------------
-# Matched placement.  Each row holds unit transistors (ng = 1) of one kind and
-# one W/L; a device with m = k contributes k units.  "D" is a dummy.  Device
-# references are hierarchical names in RAMP_LR.  Arrays are common-centroid
-# (diff pairs: ABBA), mirrors are interdigitated around their reference.
+# Compact matched placement.  A *strip* is a row of transistor fingers of one
+# kind and W/L; each *segment* of a strip is one multi-finger PCell, so the
+# fingers of a segment share their source/drain diffusions.  Segments are
+# separated by a diffusion break.  "D" is a dummy finger (gate, source and drain
+# on the rail).  The diffusion nets are solved from the device pins
+# (solve_segment), so a segment only lists its fingers left to right.
+# Devices with m = k appear k times.  Device references are hierarchical names.
 # --------------------------------------------------------------------------
-def _bias_grid():
-    """6 x 5 common-centroid array for the NMOS bias mirror (25 units + 5 dummies).
-
-    Every multi-unit device occupies point-symmetric pairs about the array
-    centre, so its centroid coincides with that of the reference R."""
-    R, T, C_, N, Q, P, D = "xb.MB0", "xb.MB1", "xb.MB2", "xb.MB3", "xb.MB4", "xb.MB5", "D"
-    return [
-        [D, T, C_, T, D],
-        [T, C_, N, T, C_],
-        [C_, T, R, P, C_],
-        [C_, D, Q, T, C_],
-        [C_, T, N, C_, T],
-        [D, T, C_, T, D],
-    ]
+_T, _C, _N = "xb.MB1", "xb.MB2", "xb.MB3"           # it1 (x10), icm (x10), inota (x2)
+_R, _Q, _P = "xb.MB0", "xb.MB4", "xb.MB5"           # IBIAS diode, irn, pb
 
 
-def _bias_p_grid():
-    """2 x 3 array for the PMOS mirror: diode MB6 and MB7 adjacent, MB8 cross-coupled."""
-    return [["D", "xb.MB7", "xb.MB8"], ["xb.MB8", "xb.MB6", "D"]]
+def _chain(blk, dev, n_dz=5, n_in=3):
+    """Stage-2 PMOS chain of x2/x3 (or the trip-point replica x4): one finger of the
+    single PMOS, then the deadzone devices and the inverter devices interleaved so
+    that every diffusion is shared: OUT_P |P1| VDD |DZ| n1 |DZ| VDD ... n1 |IN| OUT_N."""
+    p1, dz, inv = dev
+    return [f"{blk}.{p1}"] + [f"{blk}.{dz}"] * n_dz + [f"{blk}.{inv}"] * n_in
 
 
-ROWS = [dict(name=f"bias_n{i}", kind="nlv", w=WB, l=LB, units=u) for i, u in enumerate(_bias_grid())]
-ROWS += [dict(name=f"bias_p{i}", kind="plv", w=WB, l=LB, units=u) for i, u in enumerate(_bias_p_grid())]
-ROWS += [
-    dict(name="in_pairs", kind="nlv", w=1.56, l=0.5,
-         units=["D", "x1.MN1", "x1.MN2", "x1.MN2", "x1.MN1", "D",
-                "D", "x1.MC1", "x1.MC2", "x1.MC2", "x1.MC1", "D", "x3.MCN"]),
-    dict(name="s1_loads", kind="phv", w=0.5, l=1.0,
-         units=["D", "x1.MP1", "x1.MP2", "x1.MPC1", "x1.MPC2", "x1.MPC2", "x1.MPC1", "x1.MP2", "x1.MP1", "D"]),
-    dict(name="min_n", kind="nlv", w=0.15, l=0.13,
-         units=["D", "x2.MN_STG2_3N1", "x3.MN_STG2_3N1", "x4.M9",
-                "x2.MP_STG2_3P2", "x3.MP_STG2_3P2", "x4.M12",
-                "x2.MN_DZ_STG2_3P", "x3.MN_DZ_STG2_3P", "x4.M14", "D"]),
-    dict(name="min_p", kind="plv", w=0.15, l=0.13,
-         units=["D"] + ["x2.MN_STG2_3P1", "x3.MN_STG2_3P1", "x4.M10"] * 3
-               + ["x2.MP_DZ_STG2_3N", "x3.MP_DZ_STG2_3N", "x4.M11"] * 5
-               + ["x2.MP_STG2_3P1", "x3.MP_STG2_3P1", "x4.M13", "D"]),
-    dict(name="pota_in", kind="plv", w=1.2, l=0.5,
-         units=["D", "x3.x1.M1", "x3.x1.M2", "x3.x1.M2", "x3.x1.M1", "D", "x3.MCP"]),
-    dict(name="pota_ld", kind="nhv", w=0.5, l=2.0,
-         units=["D", "x3.x1.M4", "x3.x1.M5", "x3.x1.M5", "x3.x1.M4", "D"]),
-    dict(name="nota_in", kind="nhv", w=1.75, l=1.0,
-         units=["D", "x3.x2.M1", "x3.x2.M2", "x3.x2.M2", "x3.x2.M1", "D"]),
-    dict(name="nota_ld", kind="phv", w=0.5, l=0.75,
-         units=["D", "x3.x2.M3", "x3.x2.M4", "D"]),
-    dict(name="out_n", kind="nhv", w=2.3, l=1.0,
-         units=["D", "M1", "M1", "x3.MN_STG2_3N_R", "M1", "M1", "D"]),
-    dict(name="out_p", kind="phv", w=4.5, l=0.5,
-         units=["D", "M2", "M2", "x3.MP_STG2_3P_R", "M2", "M2", "D"]),
+STRIPS = {
+    # NMOS bias mirror, 0.5/8 um: sources on GND shared by finger pairs, every row
+    # symmetric about its centre, reference MB0 in the middle of the last row
+    "bn0": dict(kind="nlv", w=WB, l=LB, segs=[["D", _T, _T, _C, _C, _T, _T, "D"]]),
+    "bn1": dict(kind="nlv", w=WB, l=LB, segs=[["D", _C, _C, _N, _N, _C, _C, "D", _P]]),
+    "bn2": dict(kind="nlv", w=WB, l=LB, segs=[["D", _C, _C, _T, _T, _C, _C, "D"]]),
+    "bn3": dict(kind="nlv", w=WB, l=LB, segs=[["D", _T, _T], [_R, _Q], [_T, _T, "D"]]),
+    # PMOS bias mirror, 0.5/8 um
+    "bp": dict(kind="plv", w=WB, l=LB, segs=[["D", "xb.MB8", "xb.MB8", "D"], ["xb.MB6", "xb.MB7"]]),
+    # NMOS rows: POTA load (next to the PMOS bias mirror); NOTA input pair, stage 1, stage 2, output
+    "pota_ld": dict(kind="nhv", w=0.5, l=2.0,
+                    segs=[["D"], ["x3.x1.M4", "x3.x1.M5", "x3.x1.M5", "x3.x1.M4"], ["D"]]),
+    "nota_in": dict(kind="nhv", w=1.75, l=1.0,
+                    segs=[["D"], ["x3.x2.M1", "x3.x2.M2", "x3.x2.M2", "x3.x2.M1"], ["D"]]),
+    "s1_n": dict(kind="nlv", w=1.56, l=0.5,
+                 segs=[["D"], ["x1.MN1", "x1.MN2", "x1.MN2", "x1.MN1"], ["D"],
+                       ["x1.MC1", "x1.MC2", "x1.MC2", "x1.MC1"], ["D", "x3.MCN", "D"]]),
+    "s2_n": dict(kind="nlv", w=0.15, l=0.13,
+                 segs=[["D"], ["x2.MP_STG2_3P2", "x2.MN_DZ_STG2_3P", "x2.MN_STG2_3N1"],
+                       ["x3.MN_STG2_3N1", "x3.MN_DZ_STG2_3P", "x3.MP_STG2_3P2"],
+                       ["x4.M12", "x4.M14", "x4.M9"], ["D"]]),
+    "out_n": dict(kind="nhv", w=2.3, l=1.0, segs=[["D", "M1", "M1", "x3.MN_STG2_3N_R"], ["M1", "M1", "D"]]),
+    # PMOS signal row (POTA input pair, NOTA load, stage-1 loads, stage 2, output)
+    "pota_in": dict(kind="plv", w=1.2, l=0.5,
+                    segs=[["D"], ["x3.x1.M2", "x3.x1.M1", "x3.x1.M1", "x3.x1.M2"], ["D", "x3.MCP", "D"]]),
+    "nota_ld": dict(kind="phv", w=0.5, l=0.75, segs=[["D"], ["x3.x2.M3", "x3.x2.M4"], ["D"]]),
+    "s1_p": dict(kind="phv", w=0.5, l=1.0,
+                 segs=[["D"], ["x1.MP1", "x1.MP2", "x1.MP2", "x1.MP1"],
+                       ["x1.MPC1", "x1.MPC2", "x1.MPC2", "x1.MPC1"], ["D"]]),
+    "s2_p": dict(kind="plv", w=0.15, l=0.13,
+                 segs=[["D"], _chain("x2", ("MP_STG2_3P1", "MP_DZ_STG2_3N", "MN_STG2_3P1")),
+                       _chain("x3", ("MP_STG2_3P1", "MP_DZ_STG2_3N", "MN_STG2_3P1"))[::-1],
+                       _chain("x4", ("M13", "M11", "M10")), ["D"]]),
+    "out_p": dict(kind="phv", w=4.5, l=0.5, segs=[["D", "M2", "M2", "x3.MP_STG2_3P_R"], ["M2", "M2", "D"]]),
+}
+
+# rhigh: each 100-kOhm resistor (W = 0.5 um, L = 33.7 um) is split into ten series
+# segments of 3.37 um, interleaved ABBA x 5; both terminals of each resistor sit on the
+# heads that face the stage-1 channel; LVS merges the series segments.
+RES = dict(w=0.5, lengths=[3.37] * 10, order=["x1.R1", "x1.R3", "x1.R3", "x1.R1"] * 5)
+MIMS = ["x3.CDN", "x3.CDP"]
+
+# floor plan, bottom to top: (strip names left to right, side of the gate contacts)
+BANDS = [
+    (["bn0"], "down"), (["bn1"], "up"), (["bn2"], "down"), (["bn3"], "up"),
+    (["bp", "pota_ld"], "down"),
+    (["nota_in", "rhigh", "s1_n", "s2_n", "out_n"], "down"),
+    (["pota_in", "nota_ld", "s1_p", "s2_p", "out_p"], "up"),
 ]
-
-# rhigh resistors: each 100 kOhm resistor is split into four series segments
-# laid out common-centroid (ABBAABBA); LVS merges the series segments.
-RES_ROW = dict(name="cm_res", w=0.5, l=33.7 / 4,
-               units=["x1.R1", "x1.R3", "x1.R3", "x1.R1", "x1.R1", "x1.R3", "x1.R3", "x1.R1"])
-MIMS = ["x3.CDP", "x3.CDN"]
-
-# floor plan: two columns of rows with the routing spine between them; each band
-# holds a left and a right row that share the band's gate and source/drain channels
-BANDS = [("bias_n0", "pota_ld"), ("bias_n1", "nota_in"), ("bias_n2", "pota_in"),
-         ("bias_n3", "nota_ld"), ("bias_n4", "out_n"), ("bias_n5", "in_pairs"),
-         ("bias_p0", "cm_res"), ("bias_p1", "s1_loads"), ("min_n", "out_p"), ("min_p", None)]
 
 
 def dummy_cell():
-    """DUMMY_LR: one dummy device per (kind, W, L) with m = number of dummies."""
+    """DUMMY_LR: one dummy device per (kind, W, L) with m = number of dummy fingers."""
     count = {}
-    for r in ROWS:
-        n = sum(1 for u in r["units"] if u == "D")
+    for st in STRIPS.values():
+        n = sum(1 for seg in st["segs"] for f in seg if f == "D")
         if n:
-            key = (r["kind"], r["w"], r["l"])
+            key = (st["kind"], st["w"], st["l"])
             count[key] = count.get(key, 0) + n
     items = []
     for i, ((kind, w, l), n) in enumerate(sorted(count.items())):
@@ -283,21 +285,61 @@ def flatten(cell=TOP, prefix="", conn=None):
     return out
 
 
+def solve_segment(fingers, kind):
+    """Diffusion nets (len(fingers) + 1) of one shared-diffusion segment: every finger
+    connects the diffusions on its two sides to its source and drain."""
+    devs = {d["name"]: d for d in flatten()}
+    rail = "GND" if kind.startswith("n") else "VDD"
+
+    def sd(f):
+        if f == "D":
+            return rail, rail
+        return devs[f]["pins"]["S"], devs[f]["pins"]["D"]
+
+    for first in (0, 1):
+        a, b = sd(fingers[0])
+        nets = [a, b] if first == 0 else [b, a]
+        for f in fingers[1:]:
+            s_, d_ = sd(f)
+            if nets[-1] == s_:
+                nets.append(d_)
+            elif nets[-1] == d_:
+                nets.append(s_)
+            else:
+                break
+        else:
+            return nets
+    raise ValueError(f"fingers cannot share diffusions: {fingers}")
+
+
+def gate_net(f, kind):
+    if f == "D":
+        return "GND" if kind.startswith("n") else "VDD"
+    return {d["name"]: d for d in flatten()}[f]["pins"]["G"]
+
+
 def check_rows():
-    """Every MOS unit appears exactly m times in the rows and nowhere else."""
+    """Every MOS device appears exactly m times in the strips, with the strip's W/L,
+    and every segment can share its diffusions."""
     devs = {d["name"]: d for d in flatten() if d["kind"] in ("nlv", "plv", "nhv", "phv")}
     used = {}
-    for r in ROWS:
-        for u in r["units"]:
-            if u == "D":
-                continue
-            d = devs[u]
-            assert (d["kind"], d["w"], d["l"]) == (r["kind"], r["w"], r["l"]), (u, r["name"])
-            used[u] = used.get(u, 0) + 1
+    for name, st in STRIPS.items():
+        for seg in st["segs"]:
+            solve_segment(seg, st["kind"])
+            for f in seg:
+                if f == "D":
+                    continue
+                d = devs[f]
+                assert (d["kind"], d["w"], d["l"]) == (st["kind"], st["w"], st["l"]), (f, name)
+                used[f] = used.get(f, 0) + 1
     for n, d in devs.items():
         if n.startswith("xd."):
             continue
         assert used.get(n, 0) == d["m"], f"{n}: placed {used.get(n, 0)} of m={d['m']}"
+    rs = {d["name"]: d for d in flatten() if d["kind"] == "rhigh"}
+    for r, d in rs.items():
+        tot = sum(l for o, l in zip(RES["order"], RES["lengths"] * 2) if o == r)
+        assert abs(tot - d["l"]) < 1e-6, (r, tot)
     return True
 
 
@@ -306,4 +348,4 @@ if __name__ == "__main__":
     devs = flatten()
     print(f"{len(devs)} primitive devices, "
           f"{sum(d['m'] for d in devs if d['kind'] not in ('rhigh', 'cmim'))} MOS units "
-          f"(incl. dummies), rows OK")
+          f"(incl. dummies), strips OK")

@@ -76,7 +76,7 @@ C {sg13g2_pr/sg13_lv_nmos.sym} 1420 40 0 0 {name=MD4
 l=8u
 w=0.5u
 ng=1
-m=5
+m=8
 model=sg13_lv_nmos
 spiceprefix=X
 }
@@ -188,7 +188,7 @@ C {sg13g2_pr/sg13_lv_pmos.sym} 430 480 0 0 {name=MD11
 l=0.5u
 w=1.2u
 ng=1
-m=2
+m=3
 model=sg13_lv_pmos
 spiceprefix=X
 }
