@@ -25,32 +25,39 @@ study that leads to v2. Run from this directory; outputs go to `sim/build/redesi
 3. **I_Q spread (σ of log10 I_Q ≈ 1.8)** comes only from stage 2 and its replica: the loop regulates the
    replica, not the signal path, and stage 2 amplifies the replica/signal-path trip mismatch ~20×.
 
-## v2 status (prototype `v2.py`, post-layout proxy: 12/10/8 fF on Vo_STG1/mp_dz/mn_dz)
+## v2 status (prototype `v2.py`, parameters in `v2_final.json`, post-layout proxy 12/10/8 fF)
 
-Main loop — done (configuration `chk.BASE` with `cmfb="diode"`):
+Frozen v2 (`chk.BASE` + `v2_final.json`):
 
 | | Result |
 |:--|:--|
-| Topology | PMOS input pair 8 × 2.5/0.5 µm, NMOS loads, 25 kΩ rhigh loads, 40 µA tail (wide 4/1 tail devices), diode CMFB |
-| Stage 2 | MN3-gate inverter ×3; MP3-gate inverter 1 P : 6 N : 6 starve (L = 0.3 µm) |
-| Output | MN3 4 × 1.15/0.5 µm (was 2.3/1), MP3 unchanged |
-| Reference | constant-gm I_BIAS ∝ T/R (ideal input; tracks rhigh) — flattens the crossover over PVT |
-| UGF at TT | 18.1 MHz |
-| Worst PM / GM (7 corners) | 52° / 15.9 dB, no limit cycle for 10–200-mV steps |
-| Supply current | 153 µA |
-| Systematic offset | ≤ 0.9 mV over corners (with servo) |
-| Buffer gain error | 0.6–1.3 % at hot corners (v1: 1.46 %); not present in SC use (fixed input CM) |
+| Stage 1 | PMOS pair 16 x 2.5/0.5 um per side, 40 uA tail; NMOS loads 4 x 1/2 um; 17-kOhm rhigh loads; diode CMFB |
+| Stage 2 / output | as BASE; MN3 4 x 1.15/1.0 um (L = 1 um adds 5 dB of fast-loop DC gain), MP3 4 x 4.5/0.5 um |
+| Reference | constant-gm I_BIAS proportional to T/R (ideal input, tracks rhigh) |
+| I_Q regulation | MP3 gate (via R_S = 510 kOhm) vs. MP_R (2 fingers, 2 x I_BIAS); two-stage Miller integrator, hv devices, 4/4-um pair, 0.9-nA tail (6 series hv units on the nA divider), 4-pF MIM; crossover 1.0-4.0 kHz, PM >= 88.7 deg |
+| Offset servo | integrates Vo1 - net2, trims V1_CM through 510 k / 68 k; hv 3/3-um pair, 1.7-nA tail, 1-pF MIM; crossover 0.5-1.3 kHz |
+| nA divider | I_BIAS -> 13 hv PMOS 1/1 (77 nA) -> 14 hv NMOS 0.3/2 units (5.5 nA each); hv units keep the ratio within +-8 % (lv units at FF 125 degC pass nA at V_GS = 45 mV and are off by 1.7x) |
+| Main loop (7 corners) | PM >= 54 deg, GM >= 14.6 dB, UGF 14.2 MHz TT (max 18.2), buffer ts(0.1 %) <= 119 ns, systematic offset <= 0.23 mV, 157 uA |
+| SC, 200-mV step | error at 250 ns <= 0.055 % (FF 125 degC: 0.13 %) |
+| Mismatch (TT) | offset sigma 1.38 mV (+-3 sigma = +-4.1 mV), I_Q sigma 9.9 % (before the final resizing; to be re-run) |
+| Start-up | the slow loops settle in about 1 ms from power-up |
 
-With ideal slow loops: I_Q P5–P95 1.9–2.3 µA under mismatch (σ ≈ 17–20 %), offset σ ≈ 1.6 mV.
+Why the slow loops are slow: a continuous-time loop that moves the offset or the deadzone integrates the transient
+excursion of the node it senses and leaves a settling tail. Above the fast loop's own pole (5-30 kHz) the tail is
+about step x f_slow / (beta x f_UGF); below it the error between fast settling and slow-loop convergence is the fast
+loop's DC gain, 1 / (beta x A_fast). A_fast (slow loops frozen, `fastgain.py`) is 68 dB at FF 125 degC and 82 dB at
+SS -40 degC; it sets the SC accuracy at hot corners.
 
-Open:
-* **Regulation integrator.** The transistor-level two-stage Miller integrator works, but the control path
-  VCTRLN → V_GP has a gain of ~12, so even a 0.33-µA integrator with 1 pF crosses over at 3–18 MHz
-  (unstable against the main loop). Needed: ≤ ~300 kHz → weaker control path (partial starve control) or a
-  tens-of-nA integrator.
-* **Offset servo** (transistor level): stable, 72–118 kHz, PM 86°; DC gain 37–45 dB (enough).
-* Then: VDD ± 5 %, Monte Carlo (process / mismatch / both), schematic, layout, extraction, report.
+Known limitation: in the unity-gain buffer the fast loop has a common-mode-dependent error (about 1 % of an input-CM
+change) that only the slow servo removes; the DC transfer is exact (`dcsw2.py`), and the SC configuration (fixed
+input CM) does not see it.
 
-Rejected on the way: high stage-1 gain (A1 ≥ 10, with or without cascode) — large-signal limit cycle at cold
-corners even with 70° PM; high-gain CMFB — its loop shares Vo_STG1 with the main loop and is unstable in every
-variant tried (net3 or net2 sensing, split load gates); CMFB referenced to a low-passed Vo_STG1 — bistable.
+Scripts added for this step: `sctest.py` (SC test), `sc_diag.py` (tail diagnosis), `rl_scan.py` (slow-loop gains),
+`iprobe.py` (nA currents), `fastgain.py` (fast-loop stage gains), `lctest.py` (limit-cycle steps), `dcsw2.py`,
+`mc_attr2.py` (mismatch attribution), `startup.py` (power-up).
+
+Rejected on the way: high stage-1 gain (A1 >= 10, with or without cascode) - large-signal limit cycle at cold
+corners even with 70 deg PM; high-gain CMFB - its loop shares Vo_STG1 with the main loop and is unstable in every
+variant tried; CMFB referenced to a low-passed Vo_STG1 - bistable; integrators of tens of nA - regulation tail of
+2 % after a 4-mV SC step; lv devices at nA currents - leakage-dependent offsets at 125 degC; longer stage-1 loads or
+load degeneration - GM below 12.5 dB.

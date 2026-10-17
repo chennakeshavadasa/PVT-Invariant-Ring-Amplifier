@@ -49,19 +49,37 @@ DEF = dict(
     ccr=1e-12, reg_l=24, reg_w=1.0, rz=33e3,                 # regulation Miller integrator: Cc, tail-device L (0.5/L), pair W
     ccs=2e-12, srv_l=24, rta=1e6, rtb=150e3,                 # offset servo: Cc, tail-device L, trim divider          # offset servo: "none" or "ideal" (integrates Vo1 - net2)
     mdz_l=0.13,                        # length of the VDZP starve device
+    n2_l=0.13,                         # length of the VDZN inverter (and its trip replica)
+    ldeg=0,                            # source degeneration of the stage-1 NMOS loads (ohm, rhigh)
+    nlo_w=None, nlo_l=None,            # PMOS feeding the low-current diode nlo (default tl_w/2 x tl_l: 1 uA)
+    lochain=False, N1=20, N2=25,       # matched divider IBIAS -> 1/N1 -> 1/(N1*N2) uA on nlo (units lu_w/lu_l)
+    mir_dev="lv", cs_dev="lv", in_dev="lv", srv_devs=None, reg_in=(1.0, 1.0), srv_in=(1.0, 1.0),   # integrator mirror device; input pair W/L
+    lu_w=0.3, lu_l=2.0, pu_w=None, pu_l=None, lu_dev="lv",   # divider/tail units; lu_dev hv: thick-oxide units
 )
 
 
 def lib(p, name):
     q = dict(DEF, **p)
-    def miller(pre, inp, inm, out, ccv, itail_l, w_in, l_in):
-        """Two-stage Miller integrator: NMOS pair (gate inp raises out), PMOS mirror, PMOS CS + NMOS sink."""
-        return (f"X{pre}1 {pre}d1 {inm} {pre}t GND sg13_lv_nmos w={w_in}u l={l_in}u ng=1 m=1\n"
-                f"X{pre}2 {pre}o1 {inp} {pre}t GND sg13_lv_nmos w={w_in}u l={l_in}u ng=1 m=1\n"
-                f"X{pre}3 {pre}d1 {pre}d1 VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m=1\n"
-                f"X{pre}4 {pre}o1 {pre}d1 VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m=1\n"
-                f"X{pre}5 {pre}t IBIAS GND GND sg13_lv_nmos w=0.5u l={itail_l}u ng=1 m=1\n"
-                f"X{pre}6 {out} {pre}o1 VDD VDD sg13_lv_pmos w=1u l=1u ng=1 m=1\n"
+    def miller(pre, inp, inm, out, ccv, itail_l, w_in, l_in, devs=None):
+        in_dev, mir_dev, cs_dev = devs or (q["in_dev"], q["mir_dev"], q["cs_dev"])
+        """Two-stage Miller integrator: NMOS pair (gate inp raises out), PMOS mirror, PMOS CS + NMOS sink.
+        itail_l: number -> tail 0.5/itail_l on IBIAS; "lo:L" -> tail 0.15/L on the low-current gate nlo."""
+        if str(itail_l).startswith("p:"):     # M parallel units on nlo: M/(N1*N2) uA
+            tail = f"X{pre}5a {pre}t nlo GND GND sg13_{q['lu_dev']}_nmos w={q['lu_w']}u l={q['lu_l']}u ng=1 m={int(itail_l[2:])}\n"
+        elif str(itail_l).startswith("u:"):     # S series units on nlo: 1/(N1*N2*S) uA
+            S = int(itail_l[2:]); nodes = [f"{pre}t"] + [f"{pre}s{i}" for i in range(1, S)] + ["GND"]
+            tail = "".join(f"X{pre}5{chr(97 + i)} {nodes[i]} nlo {nodes[i + 1]} GND sg13_{q['lu_dev']}_nmos w={q['lu_w']}u l={q['lu_l']}u ng=1 m=1\n"
+                           for i in range(S))
+        elif str(itail_l).startswith("lo:"):
+            tail = f"X{pre}5 {pre}t nlo GND GND sg13_lv_nmos w=0.15u l={itail_l[3:]}u ng=1 m=1\n"
+        else:
+            tail = f"X{pre}5 {pre}t IBIAS GND GND sg13_lv_nmos w=0.5u l={itail_l}u ng=1 m=1\n"
+        return (f"X{pre}1 {pre}d1 {inm} {pre}t GND sg13_{in_dev}_nmos w={w_in}u l={l_in}u ng=1 m=1\n"
+                f"X{pre}2 {pre}o1 {inp} {pre}t GND sg13_{in_dev}_nmos w={w_in}u l={l_in}u ng=1 m=1\n"
+                f"X{pre}3 {pre}d1 {pre}d1 VDD VDD sg13_{mir_dev}_pmos w=1u l=2u ng=1 m=1\n"
+                f"X{pre}4 {pre}o1 {pre}d1 VDD VDD sg13_{mir_dev}_pmos w=1u l=2u ng=1 m=1\n"
+                + tail +
+                f"X{pre}6 {out} {pre}o1 VDD VDD sg13_{cs_dev}_pmos w=1u l=1u ng=1 m=1\n"
                 f"X{pre}7 {out} IBIAS GND GND sg13_lv_nmos w=0.5u l=8u ng=1 m=1\n"
                 f"X{pre}Z {out} {pre}z GND rhigh w=0.5e-6 l={q['rz'] / RSQ:.4g}e-6 m=1 b=0\n"
                 f"C{pre}C {pre}z {pre}o1 {ccv}")
@@ -77,16 +95,17 @@ def lib(p, name):
 * ---- bias: NMOS mirror of 0.5/8 units; PMOS mirror for the stage-1 and CMFB tails ------------
 XMB0 IBIAS IBIAS GND GND sg13_lv_nmos w=0.5u l=8u ng=1
 XMB2 pb IBIAS GND GND sg13_lv_nmos w=0.5u l=8u ng=1 m=2
-XMB3 inota IBIAS GND GND sg13_lv_nmos w=0.5u l=8u ng=1 m={q['ota_tail']}
-XMB4 irn IBIAS GND GND sg13_lv_nmos w=0.5u l=8u ng=1 m={q['iref']}
+{{xmb3}}XMB4 irn IBIAS GND GND sg13_lv_nmos w=0.5u l=8u ng=1 m={q['iref']}
 XMB5 VCTRLP IBIAS GND GND sg13_lv_nmos w=0.5u l=8u ng=1 m={q['istarve']}
 XMBP0 pb pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m=1
 XMBP1 it1 pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m={q['tail'] // 2}
 XMBP2 icm pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m={q['cm_tail'] // 2}
+XMBP3 nlo pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m=1
+XMBL0 nlo nlo GND GND sg13_lv_nmos w=0.5u l=8u ng=1 m=8
 * ---- stage 1: PMOS input pair, NMOS loads, rhigh CM sense, PMOS-pair CMFB -----------------
 {{s1pair}}
-XMP1 net2 vcmfb GND GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={q['ld_m']}
-XMP2 Vo_STG1 {vo1gate} GND GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={q['ld_m']}
+XMP1 net2 vcmfb @ds1@ GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={q['ld_m']}
+XMP2 Vo_STG1 {vo1gate} @ds2@ GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={q['ld_m']}
 XR1 net2 net3 GND rhigh w=0.5e-6 l={rl:.4g}e-6 m=1 b=0
 XR3 Vo_STG1 net3 GND rhigh w=0.5e-6 l={rl:.4g}e-6 m=1 b=0
 XMC1 vcmfb V1_CM icm VDD sg13_lv_pmos w={q['mc_w']}u l={q['mc_l']}u ng=1 m={q['mc_m']}
@@ -94,8 +113,8 @@ XMC2 dB {cmsense} icm VDD sg13_lv_pmos w={q['mc_w']}u l={q['mc_l']}u ng=1 m={q['
 {{cmfbload}}
 {{cmref}}
 * ---- stage 2 ------------------------------------------------------------------------
-XMN_STG2_3N1 mn_dz Vo_STG1 GND GND sg13_lv_nmos w=0.15u l=0.13u ng=1 m={q['kN']}
-XMN_STG2_3P1 mn_dz Vo_STG1 n2a VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m={3 * q['kN']}
+XMN_STG2_3N1 mn_dz Vo_STG1 GND GND sg13_lv_nmos w=0.15u l={q['n2_l']}u ng=1 m={q['kN']}
+XMN_STG2_3P1 mn_dz Vo_STG1 n2a VDD sg13_lv_pmos w=0.15u l={q['n2_l']}u ng=1 m={3 * q['kN']}
 XMP_DZ_STG2_3N n2a VCTRLP VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m={5 * q['kN']}
 XMP_STG2_3P2 mp_dz Vo_STG1 n2b GND sg13_lv_nmos w=0.15u l=0.13u ng=1 m={q['nP']}
 XMP_STG2_3P1 mp_dz Vo_STG1 VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m={q['pP']}
@@ -108,8 +127,7 @@ XM2 Vout mp_dz vdd_q VDD sg13_hv_pmos w={q['mp3_w']}u l=0.5u ng=1 m={q['mp3_m']}
 XMP_R irn irn VDD VDD sg13_hv_pmos w={q['mp3_w']}u l=0.5u ng=1 m={q['mpr_m']}
 XRS mp_dz vgps GND rhigh w=0.5e-6 l={q['Rs'] / RSQ:.4g}e-6 m=1 b=0
 {{ota}}
-CCN VCTRLN GND {q["Cn"]}
-* ---- fixed starve bias of the VDZN inverter ---------------------------------------------
+{{ccn}}* ---- fixed starve bias of the VDZN inverter ---------------------------------------------
 XMD VCTRLP VCTRLP VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m=1
 .ends
 """
@@ -118,8 +136,8 @@ XMD VCTRLP VCTRLP VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m=1
                  f"XRLP Vo_STG1 V1_CM GND rhigh w=0.5e-6 l={q['Rlp'] / RSQ:.4g}e-6 m=1 b=0\n"
                  f"CLP V1_CM GND {q['Clp']}")
     else:
-        cmref = (f"XMT1 V1_CM V1_CM GND GND sg13_lv_nmos w=0.15u l=0.13u ng=1 m={q['kN']}\n"
-                 f"XMT2 V1_CM V1_CM ntr VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m={3 * q['kN']}\n"
+        cmref = (f"XMT1 V1_CM V1_CM GND GND sg13_lv_nmos w=0.15u l={q['n2_l']}u ng=1 m={q['kN']}\n"
+                 f"XMT2 V1_CM V1_CM ntr VDD sg13_lv_pmos w=0.15u l={q['n2_l']}u ng=1 m={3 * q['kN']}\n"
                  f"XMT3 ntr VCTRLP VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m={5 * q['kN']}")
     t = t.replace("{cmref}", cmref)
     if q["cmfb"] == "mirror":     # high-gain CMFB: NMOS mirror load, high-impedance output vcmfb
@@ -127,20 +145,36 @@ XMD VCTRLP VCTRLP VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m=1
               f"XMPC2 dB dB GND GND sg13_lv_nmos w={q['cml_w']}u l={q['cml_l']}u ng=1 m=1\n"
               f"CCM vcmfb GND {q['ccm']}" + (f"\nXRCM vcmfb dB GND rhigh w=0.5e-6 l={q['rcm'] / RSQ:.4g}e-6 m=1 b=0" if q['rcm'] else ""))
     else:
-        cl = (f"XMPC1 vcmfb vcmfb GND GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={mpc}\n"
-              f"XMPC2 dB dB GND GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={mpc}")
+        cl = (f"XMPC1 vcmfb vcmfb @dsc1@ GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={mpc}\n"
+              f"XMPC2 dB dB @dsc2@ GND sg13_lv_nmos w={q['ld_w']}u l={q['ld_l']}u ng=1 m={mpc}")
     if q["cmsplit"]:
         cl += (f"\nXRCL vcmfb vcmlp GND rhigh w=0.5e-6 l={q['rcl'] / RSQ:.4g}e-6 m=1 b=0\nCCL vcmlp GND {q['ccl']}")
     t = t.replace("{cmfbload}", cl)
+    if q["ldeg"]:     # source degeneration of the stage-1 loads (and of the CMFB diodes, scaled by the current ratio)
+        rd = q["ldeg"] / RSQ; rc = q["ldeg"] * q["ld_m"] / mpc / RSQ
+        t = t.replace("@ds1@", "sd1").replace("@ds2@", "sd2").replace("@dsc1@", "sc1").replace("@dsc2@", "sc2")
+        t = t.replace(".ends", f"XRD1 sd1 GND GND rhigh w=0.5e-6 l={rd:.4g}e-6 m=1 b=0\nXRD2 sd2 GND GND rhigh w=0.5e-6 l={rd:.4g}e-6 m=1 b=0\n"
+                               f"XRC1 sc1 GND GND rhigh w=0.5e-6 l={rc:.4g}e-6 m=1 b=0\nXRC2 sc2 GND GND rhigh w=0.5e-6 l={rc:.4g}e-6 m=1 b=0\n.ends")
+    else:
+        for k in ("@ds1@", "@ds2@", "@dsc1@", "@dsc2@"):
+            t = t.replace(k, "GND")
     t = t.replace("XMBP0 pb pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m=1",
                   f"XMBP0 pb pb VDD VDD sg13_lv_pmos w={q['tl_w']}u l={q['tl_l']}u ng=1 m=1")
     t = t.replace(f"XMBP1 it1 pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m={q['tail'] // 2}",
                   f"XMBP1 it1 pb VDD VDD sg13_lv_pmos w={q['tl_w']}u l={q['tl_l']}u ng=1 m={q['tail'] // 2}")
     t = t.replace(f"XMBP2 icm pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m={q['cm_tail'] // 2}",
                   f"XMBP2 icm pb VDD VDD sg13_lv_pmos w={q['tl_w']}u l={q['tl_l']}u ng=1 m={q['cm_tail'] // 2}")
+    t = t.replace("XMBP3 nlo pb VDD VDD sg13_lv_pmos w=1u l=2u ng=1 m=1",
+                  f"XMBP3 nlo pb VDD VDD sg13_lv_pmos w={q['nlo_w'] or q['tl_w'] / 2:g}u l={q['nlo_l'] or q['tl_l']}u ng=1 m=1")
+    if q["lochain"]:
+        t = t.replace(t[t.index("XMBP3 nlo"):t.index("* ---- stage 1")],
+                      f"XMBL0 plo IBIAS GND GND sg13_lv_nmos w=0.5u l=8u ng=1 m=1\n"
+                      f"XMBL1 plo plo VDD VDD sg13_{q['lu_dev']}_pmos w={q['pu_w'] or q['lu_w']}u l={q['pu_l'] or q['lu_l']}u ng=1 m={q['N1']}\n"
+                      f"XMBL2 nlo plo VDD VDD sg13_{q['lu_dev']}_pmos w={q['pu_w'] or q['lu_w']}u l={q['pu_l'] or q['lu_l']}u ng=1 m=1\n"
+                      f"XMBL3 nlo nlo GND GND sg13_{q['lu_dev']}_nmos w={q['lu_w']}u l={q['lu_l']}u ng=1 m={q['N2']}\n")
     if q["servo"] == "miller":
         t = t.replace("XMT1 V1_CM V1_CM GND", "XMT1 vtrip vtrip GND").replace("XMT2 V1_CM V1_CM ntr", "XMT2 vtrip vtrip ntr")
-        t = t.replace(".ends", miller("XSV", "Vo_STG1", "net2", "VSV", q["ccs"], q["srv_l"], 1.0, 1.0) + "\n"
+        t = t.replace(".ends", miller("XSV", "Vo_STG1", "net2", "VSV", q["ccs"], q["srv_l"], *q["srv_in"], devs=q["srv_devs"]) + "\n"
                       f"XRTA VSV V1_CM GND rhigh w=0.5e-6 l={q['rta'] / RSQ:.4g}e-6 m=1 b=0\n"
                       f"XRTB vtrip V1_CM GND rhigh w=0.5e-6 l={q['rtb'] / RSQ:.4g}e-6 m=1 b=0\n.ends")
     if q["servo"] == "ideal":
@@ -158,7 +192,7 @@ XMD VCTRLP VCTRLP VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m=1
                   f"XMN2 Vo_STG1 plus it1 VDD sg13_lv_pmos w={q['s1_w']}u l={q['s1_l']}u ng=1 m={q['s1_m']}")
     t = t.replace("{s1pair}", s1pair)
     if q["reg"] == "miller":
-        ota = miller("XRG", "vgps", "irn", "VCTRLN", q["ccr"], q["reg_l"], q["reg_w"], 1.0)
+        ota = miller("XRG", "vgps", "irn", "VCTRLN", q["ccr"], q["reg_l"], *q["reg_in"])
     elif q["reg"] == "ideal":
         ota = f"GREG GND VCTRLN vgps irn {q['greg']}\nRREG VCTRLN GND 1e9"
     else:
@@ -167,6 +201,8 @@ XMD VCTRLP VCTRLP VDD VDD sg13_lv_pmos w=0.15u l=0.13u ng=1 m=1
                "XNM3 VCTRLN nota2 VDD VDD sg13_hv_pmos w=0.5u l=0.75u ng=1 m=1\n"
                "XNM4 nota2 nota2 VDD VDD sg13_hv_pmos w=0.5u l=0.75u ng=1 m=1")
     t = t.replace("{ota}", ota)
+    t = t.replace("{xmb3}", f"XMB3 inota IBIAS GND GND sg13_lv_nmos w=0.5u l=8u ng=1 m={q['ota_tail']}\n" if q["reg"] == "ota" else "")
+    t = t.replace("{ccn}", f"CCN VCTRLN GND {q['Cn']}\n" if q["Cn"] else "")
     f = OUT / f"lib_{name}.spice"
     f.write_text(t)
     return f

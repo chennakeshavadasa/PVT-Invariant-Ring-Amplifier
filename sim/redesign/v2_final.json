@@ -1,0 +1,38 @@
+{
+ "cmfb": "diode",
+ "reg": "miller",
+ "servo": "miller",
+ "Cn": 0,
+ "ccr": 4e-12,
+ "lochain": true,
+ "lu_dev": "hv",
+ "lu_w": 0.3,
+ "lu_l": 2,
+ "pu_w": 1,
+ "pu_l": 1,
+ "srv_l": "u:3",
+ "ccs": 1e-12,
+ "mir_dev": "hv",
+ "reg_in": [
+  4,
+  4
+ ],
+ "srv_in": [
+  3,
+  3
+ ],
+ "reg_l": "u:6",
+ "cs_dev": "hv",
+ "in_dev": "hv",
+ "mn3_l": 1.0,
+ "mpr_m": 2,
+ "iref": 2,
+ "s1_m": 16,
+ "R": 17003.0,
+ "N1": 13,
+ "N2": 14,
+ "rz": 34005.9,
+ "Rs": 510089.0,
+ "rta": 510089.0,
+ "rtb": 68011.9
+}
