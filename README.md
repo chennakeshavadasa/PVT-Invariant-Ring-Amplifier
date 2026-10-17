@@ -1,11 +1,7 @@
 <h1 align="center">PVT-Tolerant Ring Amplifier with Deadzone Regulation in IHP SG13G2</h1>
 
-<p align="center"><i>Schematic study, layout-ready redesign and a DRC/LVS-clean matched layout of the deadzone
-regulation technique of P. K. Venkatachala</i></p>
-
 <p align="center">
 Nithin Purushothama &nbsp;·&nbsp; <a href="https://github.com/chennakeshavadasa">github.com/chennakeshavadasa</a><br>
-<sub>Work carried out under the guidance of Praveen Kumar Venkatachala</sub>
 </p>
 
 <p align="center">
