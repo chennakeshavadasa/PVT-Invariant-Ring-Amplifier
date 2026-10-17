@@ -245,7 +245,7 @@ BANDS = [
 TOP = "RAMP_V2"
 DUMMY = "DUMMY_V2"
 LABELS = ("V1_CM", "VCTRLN", "VCTRLP", "Vo_STG1", "Vo1n", "mn_dz", "mp_dz", "icm", "irn", "it1", "nlo", "vtrip",
-          "xr.o1", "xs.o1", "xr.z", "xs.z")
+          "xr.o1", "xs.o1", "xr.z", "xs.z", "xs.VSV", "xr.vgps", "x1.vcmfb")
 PORT_EDGE = dict(IBIAS="bottom", minus="bottom", plus="bottom", Vout="top")
 
 
