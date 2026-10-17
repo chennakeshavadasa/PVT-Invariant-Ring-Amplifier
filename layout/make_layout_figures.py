@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Annotated layout figures from layout/RAMP_LR.gds and RAMP_LR_placement.json.
+"""Annotated layout figures from layout/RAMP_LR.gds (RAMP_V2.gds with the argument v2) and the
+placement file written by gen_layout.py.
 
 Renders views with KLayout (layout/render.py) and labels the blocks and, in the
 close-ups, the device of every finger.  Output: docs/figures/layout/.
-Run after gen_layout.py:  python3 layout/make_layout_figures.py
+Run after gen_layout.py:  python3 layout/make_layout_figures.py [v2]
 """
 import json
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -21,8 +23,10 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 OUT = REPO / "docs" / "figures" / "layout"
 OUT.mkdir(parents=True, exist_ok=True)
-GDS = HERE / "RAMP_LR.gds"
-P = json.load(open(HERE / "RAMP_LR_placement.json"))
+V2 = len(sys.argv) > 1 and sys.argv[1] == "v2"
+TOP = "RAMP_V2" if V2 else "RAMP_LR"
+GDS = HERE / f"{TOP}.gds"
+P = json.load(open(HERE / f"{TOP}_placement.json"))
 TOPM = "50/0,49/0,66/0,67/0,126/0,129/0,36/0,125/0"                 # Metal4 and above (MIM)
 UPPER = "10/0,19/0,29/0,30/0,30/25,30/2," + TOPM                     # Metal2 and above
 
@@ -156,6 +160,89 @@ def fig_matching():
     print("wrote", OUT / "fig_layout_matching.png")
 
 
+ROLE2 = {"nb0": "NMOS bias mirror (0.5/8 µm)", "nb1": "bias mirror, integrator sinks", "trn": "trip NMOS",
+         "nlo_a": "nA divider + regulation tail", "nlo_b": "nA divider + servo tail",
+         "rg_in": "regulation pair (hv 4/4)", "sv_in": "servo pair (hv 3/3)", "rhigh_a": "R_S, R_Z",
+         "rhigh_b": "R_TA, R_TB", "pmir": "integrator mirrors", "p11": "PMOS divider, integrator outputs",
+         "rhigh_c": "R1/R3", "s1n": "stage-1 loads", "s2n": "st.-2 N", "dzn": "starve", "out_n": "MN3",
+         "s1p": "stage-1 PMOS input pair (ABBA)", "s2p": "stage 2 (P)", "out_p": "MP3 + MP_R",
+         "pt": "PMOS tail mirror (stage 1, CMFB)", "cm": "CMFB pair", "trp": "trip PMOS"}
+
+
+def fig_full_v2():
+    x0, y0, x1, y1 = P["bbox"]
+    box = (x0 - 0.5, y0 - 0.5, x1 + 0.5, y1 + 0.5)
+    img = render(box, 2400, TOPM)
+    w = 7.16
+    fig = plt.figure(figsize=(w, w * (box[3] - box[1] + 12) / (box[2] - box[0])))
+    ax = fig.add_axes([0.0, 0.0, 1.0, 1.0])
+    ax.imshow(img, extent=(box[0], box[2], box[1], box[3]), interpolation="lanczos")
+    ax.set_xlim(box[0], box[2])
+    ax.set_ylim(box[1] - 8.5, box[3] + 1.0)
+    ax.set_axis_off()
+    S = P["strips"]
+    for m in P["mims"]:
+        ax.add_patch(Rectangle((m["x0"], m["y0"]), m["x1"] - m["x0"], m["y1"] - m["y0"], fill=False,
+                               ec=ORANGE, lw=1.0, ls="--"))
+    cap = {"xr.CC": "4-pF MIM of the regulation integrator (dashed)", "xs.CC": "1-pF MIM of the servo (dashed)"}
+    for m in P["mims"]:
+        ax.text((m["x0"] + m["x1"]) / 2, box[1] - 0.4, cap[m["ref"]], ha="center", va="top", color=ORANGE)
+    for k, s in S.items():
+        if k not in ROLE2:
+            continue
+        lab(ax, (s["x0"] + s["x1"]) / 2, (s["y0"] + s["y1"]) / 2, ROLE2[k], size=7)
+    ax.plot([x0 + 1, x0 + 11], [box[1] - 5.0] * 2, "-", color=INK, lw=2)
+    ax.text(x0 + 6, box[1] - 5.4, "10 µm", ha="center", va="top")
+    ax.text(x1, box[1] - 5.4, f"{x1 - x0:.1f} µm × {y1 - y0:.1f} µm = {(x1 - x0) * (y1 - y0) / 1e6:.4f} mm²",
+            ha="right", va="top")
+    fig.savefig(OUT / "fig_layout_v2_full.png")
+    plt.close(fig)
+    print("wrote", OUT / "fig_layout_v2_full.png")
+
+
+def fig_matching_v2():
+    fig = plt.figure(figsize=(7.16, 8.2))
+    gs = fig.add_gridspec(5, 2, height_ratios=[1.0, 0.75, 1.5, 0.75, 0.9], hspace=0.85, wspace=0.15)
+    a = fig.add_subplot(gs[0, :])
+    zoom(a, ["s1p"], width=2400, ytop=1.0, ybot=1.4)
+    label_fingers(a, "s1p", {"x1.MN1": "A", "x1.MN2": "B"}, P["strips"]["s1p"]["y0"] - 1.0, size=7)
+    a.set_title("(a) stage-1 PMOS input pair, 16 + 16 fingers of 2.5/0.5 µm, ABBA × 8, dummies D", fontsize=9)
+    b = fig.add_subplot(gs[1, :])
+    zoom(b, ["s1n"], width=2400, ytop=1.6, ybot=1.0)
+    label_fingers(b, "s1n", {"x1.MP1": "A", "x1.MP2": "B", "x1.MPC1": "C", "x1.MPC2": "E"},
+                  P["strips"]["s1n"]["y1"] + 0.1, size=7)
+    b.set_title("(b) stage-1 NMOS loads A/B (ABBA) and the CMFB diodes C/E (1/2 µm)", fontsize=9)
+    c = fig.add_subplot(gs[2, 0])
+    zoom(c, ["out_p"], ytop=1.0, ybot=1.4)
+    label_fingers(c, "out_p", {"M2": "M", "xr.MPR": "R"}, P["strips"]["out_p"]["y0"] - 1.0, size=7)
+    c.set_title("(c) MP3 (M, ×4) around MP_R (R, ×2)", fontsize=9)
+    e = fig.add_subplot(gs[2, 1])
+    zoom(e, ["rg_in"], ytop=1.6, ybot=1.4)
+    label_fingers(e, "rg_in", {"xr.M1": "A", "xr.M2": "B"}, P["strips"]["rg_in"]["y1"] + 0.1, size=8)
+    e.set_title("(d) regulation-integrator pair A/B (hv 4/4 µm)", fontsize=9)
+    d = fig.add_subplot(gs[3, :])
+    zoom(d, ["nb0"], width=2400, ytop=1.6, ybot=1.0)
+    label_fingers(d, "nb0", {"xb.MB4": "Q", "xb.MB0": "R", "xb.MB2": "P", "xb.MBL0": "L"},
+                  P["strips"]["nb0"]["y1"] + 0.1, size=7)
+    d.set_title("(e) NMOS bias row (0.5/8 µm): I_Q reference Q (×2) next to the I_BIAS diode R; P, L: tail and "
+                "nA-divider feeds", fontsize=9)
+    f = fig.add_subplot(gs[4, :])
+    zoom(f, ["nlo_a"], width=2400, ytop=1.6, ybot=1.0)
+    names = {f"xr.M5{ch}": "T" for ch in "abcdef"}
+    names["xb.MBL3"] = "U"
+    label_fingers(f, "nlo_a", names, P["strips"]["nlo_a"]["y1"] + 0.1, size=7)
+    f.set_title("(f) nA divider: diode units U (hv 0.3/2 µm) and the six-unit series tail T of the regulation "
+                "integrator", fontsize=9)
+    f.set_xlabel("x (µm)")
+    fig.savefig(OUT / "fig_layout_v2_matching.png")
+    plt.close(fig)
+    print("wrote", OUT / "fig_layout_v2_matching.png")
+
+
 if __name__ == "__main__":
-    fig_full()
-    fig_matching()
+    if V2:
+        fig_full_v2()
+        fig_matching_v2()
+    else:
+        fig_full()
+        fig_matching()

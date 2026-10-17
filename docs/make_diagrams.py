@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Architecture schematic of the layout-ready ring amplifier (docs/figures/diagrams/).
+"""Architecture schematics of the ring amplifiers RAMP_LR and RAMP_V2 (docs/figures/diagrams/).
 
 Journal-style line art: black on white, transistor level where the deadzone is set,
 device names as in the schematics, sub-figure labels below the panels.  Coordinates
@@ -12,6 +12,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.patches import Circle, Polygon, Rectangle  # noqa: E402
+from matplotlib.patches import FancyArrowPatch  # noqa: E402,F401
 
 OUT = Path(__file__).resolve().parent / "figures" / "diagrams"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -102,6 +103,27 @@ class S:
                                   fc="white", ec=K, lw=1.1, zorder=3))
         self.ax.add_patch(Circle((x + h * 0.9 + 2, y), 2, fc="white", ec=K, lw=1.0, zorder=3))
         return x + h * 0.9 + 4
+
+    def res(self, x0, y0, x1, y1, label="", side="right", n=4):
+        """Zig-zag resistor between (x0, y0) and (x1, y1), horizontal or vertical."""
+        import numpy as np
+        L = np.hypot(x1 - x0, y1 - y0)
+        ux, uy = (x1 - x0) / L, (y1 - y0) / L
+        px, py = -uy, ux
+        a, b = 0.5 * L - 9, 0.5 * L + 9
+        pts = [(x0, y0), (x0 + ux * a, y0 + uy * a)]
+        for k in range(2 * n):
+            f = a + (b - a) * (k + 0.5) / (2 * n)
+            sgn = 1 if k % 2 == 0 else -1
+            pts.append((x0 + ux * f + px * 3.5 * sgn, y0 + uy * f + py * 3.5 * sgn))
+        pts += [(x0 + ux * b, y0 + uy * b), (x1, y1)]
+        self.w(*pts)
+        if label:
+            xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+            if abs(ux) > abs(uy):
+                self.t(xm, ym + (6 if side != "below" else -6), label, va="bottom" if side != "below" else "top", size=8)
+            else:
+                self.t(xm + (7 if side == "right" else -7), ym, label, ha="left" if side == "right" else "right", size=8)
 
     def box(self, x0, y0, x1, y1, label, size=8):
         self.ax.add_patch(Rectangle((x0, y0), x1 - x0, y1 - y0, fc="white", ec=K, lw=1.0, zorder=3))
@@ -266,5 +288,129 @@ def architecture():
     print("wrote", OUT / "fig_architecture.png")
 
 
+def architecture_v2():
+    """RAMP_V2: (a) signal path, (b) the two slow loops and the bias."""
+    W, H = 516, 312
+    fig = plt.figure(figsize=(W / 72, (H - 6) / 72))
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_xlim(0, W)
+    ax.set_ylim(6, H)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    d = S(ax)
+
+    # ======================= (a) signal path =====================================
+    # stage 1: PMOS-input pair with differential outputs V_o1 / V_o1n, diode CMFB
+    x1, yc = 34, 190
+    d.ax.add_patch(Polygon([(x1, yc - 27), (x1, yc + 27), (x1 + 46, yc)], closed=True, fc="white", ec=K, lw=1.1,
+                           zorder=3))
+    d.t(x1 + 5, yc + 13, "−", size=9)
+    d.t(x1 + 5, yc - 13, "+", size=9)
+    d.t(x1 + 19, yc, "St. 1", size=8)
+    d.w((18, yc + 13), (x1, yc + 13))
+    d.t(16, yc + 13, "minus", ha="right", it=True)
+    d.w((18, yc - 13), (x1, yc - 13))
+    d.t(16, yc - 13, "plus", ha="right", it=True)
+    xbus = 112
+    d.w((x1 + 34, yc + 6.5), (xbus, yc + 6.5))
+    d.dot(xbus, yc + 6.5)
+    d.t(92, yc + 9.5, "$V_{o1}$", va="bottom", it=True)
+    d.w((x1 + 34, yc - 6.5), (92, yc - 6.5))
+    d.t(94, yc - 6.5, "$V_{o1n}$", ha="left", it=True)
+    d.box(30, 110, 74, 132, "CMFB")
+    d.w((52, 132), (52, yc - 20))
+    d.w((20, 121), (30, 121))
+    d.t(18, 121, "$V_{1,CM}$", ha="right", it=True)
+    d.t(4, 92, "PMOS pair 16 × 2.5/0.5 µm\nper side, 40 µA; loads\nR$_1$ = R$_3$ = 17 kΩ", ha="left",
+        va="top", size=8)
+    # stage 2: two current-starved inverters fed by V_o1
+    xa = 160
+    gA, outA = starved_stack(d, xa, 300, "", "", "$V_{CTRLN}$", ("", "", "M$_{DZN}$"), "")
+    gB, outB = starved_stack(d, xa, 152, "", "$V_{CTRLP}$", "", ("M$_{DZP}$", "", ""), "")
+    ys = [g[1] for g in gA + gB]
+    d.w((xbus, min(ys)), (xbus, max(ys)))
+    for gx, gy in gA + gB:
+        d.w((xbus, gy), (gx, gy))
+        if gy not in (min(ys), max(ys)) and abs(gy - (yc + 6.5)) > 1:
+            d.dot(xbus, gy)
+    # stage 3
+    xo = 252
+    d.vdd(xo, 274)
+    gP = d.mos(xo, 262, p=True, name="MP3")
+    gN = d.mos(xo, 116, p=False, name="MN3")
+    d.gnd(xo, 104)
+    d.w((xo, 250), (xo, 128))
+    d.w(outA, (214, outA[1]), (214, gP[1]), gP)
+    d.t(196, outA[1] + 3, "$V_{GP}$", ha="center", va="bottom", it=True)
+    d.w(outB, (214, outB[1]), (214, gN[1]), gN)
+    d.t(196, outB[1] + 3, "$V_{GN}$", ha="center", va="bottom", it=True)
+    yo = 189
+    d.dot(xo, yo)
+    d.w((xo, yo), (304, yo))
+    d.t(304, yo + 3, "$V_{out}$", ha="right", va="bottom", it=True)
+    d.dot(288, yo)
+    d.cap(288, yo, 158, "$C_L$")
+    d.gnd(288, 158)
+    d.group(100, 66, 230, 306, "")
+    d.t(165, 62, "stage 2 (deadzone)", va="top", size=8)
+    d.t(160, 22, "(a)", va="top")
+
+    # ======================= (b) slow loops and bias ==============================
+    x0 = 340
+    # --- I_Q regulation: MP_R diode on 2 I_BIAS, integrator ---------------------
+    d.t(x0 - 6, 306, "$I_Q$ regulation", ha="left", va="top", size=8)
+    d.res(x0, 270, x0 + 40, 270, "$R_S$ 510 kΩ")
+    d.t(x0 - 3, 270, "$V_{GP}$", ha="right", it=True)
+    pin, min_, out = d.amp(x0 + 78, 262, 40, 34, plus_top=True)
+    d.t(x0 + 96, 262, "$\\int$", size=11)
+    d.w((x0 + 40, 270), (pin[0], 270))
+    xr = x0 + 52
+    d.vdd(xr, 246)
+    gr = d.mos(xr, 234, p=True, gate="right")
+    d.t(xr - 9, 234, "MP$_R$", ha="right", size=8)
+    d.w((xr, 222), (xr, 214))
+    d.dot(xr, 216)
+    d.w((xr, 216), (gr[0], 216), (gr[0], 254), (min_[0], 254))
+    d.isrc(xr, 214, 192, down=True)
+    d.gnd(xr, 192)
+    d.t(xr - 10, 203, "2 $I_{BIAS}$", ha="right", size=8)
+    d.w(out, (W - 8, out[1]))
+    d.t(W - 8, out[1] + 3, "$V_{CTRLN}$", ha="right", va="bottom", it=True)
+    d.t(x0 + 128, 240, "0.9 nA tail\n4-pF MIM", ha="left", va="top", size=8)
+    # --- offset servo: integrator of V_o1 - V_o1n, trim divider, trip replica ----
+    d.t(x0 - 6, 176, "offset servo", ha="left", va="top", size=8)
+    pin2, min2, out2 = d.amp(x0 + 6, 146, 40, 34, plus_top=True)
+    d.t(x0 + 24, 146, "$\\int$", size=11)
+    d.w((x0 - 8, pin2[1]), pin2)
+    d.t(x0 - 10, pin2[1], "$V_{o1}$", ha="right", it=True)
+    d.w((x0 - 8, min2[1]), min2)
+    d.t(x0 - 10, min2[1], "$V_{o1n}$", ha="right", it=True)
+    d.t(x0 + 4, 124, "1.7 nA tail, 1-pF MIM", ha="left", va="top", size=8)
+    xm = x0 + 116
+    d.res(out2[0], out2[1], xm, out2[1], "$R_{TA}$ 510 kΩ")
+    d.dot(xm, out2[1])
+    d.w((xm, out2[1]), (W - 8, out2[1]))
+    d.t(W - 8, out2[1] + 3, "$V_{1,CM}$", ha="right", va="bottom", it=True)
+    d.res(xm, out2[1], xm, out2[1] - 40, "$R_{TB}$ 68 kΩ", side="right")
+    yt = out2[1] - 40
+    xi = d.inv(xm - 50, yt, 14)
+    d.w((xi, yt), (xm, yt))
+    d.dot(xi + 6, yt)
+    d.w((xi + 6, yt), (xi + 6, yt - 11), (xm - 56, yt - 11), (xm - 56, yt), (xm - 50, yt))
+    d.t(xm - 43, yt - 14, "trip-point replica", va="top", size=8)
+    # --- bias -------------------------------------------------------------------
+    d.t(x0 - 6, 70, "bias ($V_{CTRLP}$: PMOS diode on 3 $I_{BIAS}$)", ha="left", va="top", size=8)
+    d.box(x0 - 4, 30, x0 + 58, 58, "constant-$g_m$\n$I_{BIAS} \\propto T/R$", size=8)
+    d.w((x0 + 58, 44), (x0 + 70, 44))
+    d.box(x0 + 70, 30, x0 + 126, 58, "÷ 13, ÷ 14\nnA divider", size=8)
+    d.w((x0 + 126, 44), (x0 + 136, 44))
+    d.t(x0 + 138, 44, "integrator\ntails", ha="left", size=8)
+    d.t(x0 + 86, 22, "(b)", va="top")
+    fig.savefig(OUT / "fig_architecture_v2.png")
+    plt.close(fig)
+    print("wrote", OUT / "fig_architecture_v2.png")
+
+
 if __name__ == "__main__":
     architecture()
+    architecture_v2()

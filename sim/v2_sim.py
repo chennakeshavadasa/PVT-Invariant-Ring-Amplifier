@@ -43,7 +43,10 @@ BLOCKS = ("xb", "x1", "xt", "x2", "xr", "xs")
 REF = {"cgm": ("XRREF rref1 GND GND rhigh w=0.5e-6 l=33.7e-6 m=1 b=0\nVRREF rref1 GND 1\n"
                "B_B VDD IBIAS I=1u*(temper+273.15)/300.15*1e5*abs(i(VRREF))"),
        "const": "I_B VDD IBIAS 1u"}
-NODESET = ".nodeset v(x1.vctrln)=0.6 v(x1.vo_stg1)=0.72 v(x1.vo1n)=0.72 v(out)=0.825"
+# initial guess for the operating point; without the stage-2 outputs and the servo node the
+# extracted netlist can converge to a second DC solution with MP3 fully on
+NODESET = (".nodeset v(x1.vctrln)=0.6 v(x1.vo_stg1)=0.72 v(x1.vo1n)=0.72 v(out)=0.825 v(x1.mp_dz)=1.0 "
+           "v(x1.mn_dz)=0.66 v(x1.v1_cm)=0.70 v(x1.xs.vsv)=0.76")
 OPS = ("v(out) v(x1.vctrlp) v(x1.vctrln) v(x1.mp_dz) v(x1.mn_dz) v(x1.vo_stg1) v(x1.vo1n) v(x1.v1_cm) "
        "v(x1.vtrip) v(x1.xs.vsv) i(v.x1.viq) i(v2)")
 LC_STEPS = [0.01, -0.01, 0.02, -0.02, 0.05, -0.05, 0.1, -0.1, 0.2, -0.2]
@@ -181,7 +184,10 @@ V2 VDD GND dc {rp.VDD0}"""
 
 def startup_deck(corner, temp, stop="3m"):
     d = BUILD / f"startup_{corner[4:]}_{temp}"
-    body = f"""x1 VDD GND IBIAS VICM out out {SUB}
+    # Gear integration: with the trapezoidal rule the branch current of the large output PMOS
+    # rings from step to step over a ms-long run (the node voltages are unaffected)
+    body = f""".options method=gear maxord=2
+x1 VDD GND IBIAS VICM out out {SUB}
 {REF['cgm']}
 V1 VICM GND dc {rp.VCM}
 V2 VDD GND pwl(0 0 1u {rp.VDD0})

@@ -15,9 +15,11 @@ Output: sim/results/v2/mc_summary.csv, sim/results/v2/mc_waves.npz.
 Usage: python3 sim/v2_montecarlo.py [samples per set]
 """
 import csv
+import json
 import os
 import shutil
 import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -31,6 +33,13 @@ import v2_sim as v2  # noqa: E402
 N = 300
 N_WAVE = 100
 MCDIR = v2.BUILD / "mc"
+PARTIAL = v2.RESULTS / "mc_rows.partial.jsonl"     # one line per finished sample (survives an interrupted run)
+_LOCK = threading.Lock()
+
+
+def keep(row):
+    with _LOCK, open(PARTIAL, "a") as fh:
+        fh.write(json.dumps({k: (float(v) if isinstance(v, (float, np.floating)) else v) for k, v in row.items()}) + "\n")
 
 
 def run_sample(job):
@@ -40,6 +49,7 @@ def run_sample(job):
     sc = v2.sc_deck("sc_" + name, "mos_tt", 27, rp.VDD0, build=MCDIR, modeltext=models, seed=k + 1)
     row = dict(set=mset, sample=k, seed=k + 1, ok=0)
     if not (rp.ngspice(tb) and rp.ngspice(sc)):
+        keep(row)
         return row, None
     d, ds = tb.parent, sc.parent
     try:
@@ -48,8 +58,10 @@ def run_sample(job):
         row.update(v2.step_metrics(d))
         row.update(rp.sc_metrics(ds))
     except Exception:
+        keep(row)
         return row, None
     row["ok"] = 1
+    keep(row)
     wave = None
     if k < N_WAVE:
         lp, tr, st = rp.read(d / "loop.dat"), rp.read(ds / "sc.dat"), rp.read(d / "tran.dat")
@@ -70,6 +82,8 @@ def main():
     mc.MC.mkdir(parents=True, exist_ok=True)
     MCDIR.mkdir(parents=True, exist_ok=True)
     sets = dict(mc.SETS, both=mc.both_library())
+    v2.RESULTS.mkdir(parents=True, exist_ok=True)
+    PARTIAL.unlink(missing_ok=True)
     jobs = [(s, k, m) for s, m in sets.items() for k in range(n)]
     with ThreadPoolExecutor(max_workers=max(1, (os.cpu_count() or 2) - 1)) as ex:
         res = list(ex.map(run_sample, jobs))
@@ -90,6 +104,7 @@ def main():
                 else:
                     waves.setdefault(f"{s}_{key}", []).append(val)
     np.savez_compressed(v2.RESULTS / "mc_waves.npz", **{k: np.array(v) for k, v in waves.items()})
+    PARTIAL.unlink(missing_ok=True)
     for s in sets:
         ok = [r for r in rows if r["set"] == s and r["ok"]]
         off = np.array([r["offset_mv"] for r in ok])
