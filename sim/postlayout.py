@@ -32,13 +32,11 @@ OUT = rp.BUILD / "postlayout"
 PORTS = ["VDD", "GND", "IBIAS", "minus", "plus", "Vout"]
 
 
-def pex_library(pex: Path = PEX, top: str = "RAMP_LR", out: Path = OUT) -> Path:
-    """Library with the sub-circuit <top>_PEX built from magic's extraction (see the module
-    docstring); sim/v2_postlayout.py uses it for RAMP_V2."""
-    text = pex.read_text().replace("$", "_")
+def pex_library() -> Path:
+    text = PEX.read_text().replace("$", "_")
     cells = {m.group(1): (m.group(2).split(), m.group(3))
              for m in re.finditer(r"^\.subckt (\S+) (.*?)\n(.*?)^\.ends", text, re.M | re.S)}
-    top_ports, body = cells.pop(top)
+    top_ports, body = cells.pop("RAMP_LR")
     assert sorted(p.lower() for p in top_ports) == sorted(p.lower() for p in PORTS), top_ports
     # ports of every cell that reach a device terminal (the rest only carry capacitance)
     dc_ports = {}
@@ -81,11 +79,10 @@ def pex_library(pex: Path = PEX, top: str = "RAMP_LR", out: Path = OUT) -> Path:
     lines.append("VIQ VDD vdd_q 0")
     lines += [f"RFLOAT{i} {n} GND 1T" for i, n in enumerate(floating)]
     sub = "\n".join(f".subckt {n} {' '.join(p)}\n{b}.ends\n" for n, (p, b) in cells.items())
-    lib = (f"* {top} post-layout (magic PEX of layout/{top}.gds), built by sim/postlayout.py\n"
+    lib = (f"* RAMP_LR post-layout (magic PEX of layout/RAMP_LR.gds), built by sim/postlayout.py\n"
            f"* {n_iq} output-PMOS fingers on VIQ, {len(floating)} capacitor-only nodes tied to GND by 1 TOhm\n"
-           f"{sub}\n.subckt {top}_PEX {' '.join(PORTS)}\n" + "\n".join(lines) + "\n.ends\n")
-    out.mkdir(parents=True, exist_ok=True)
-    f = out / "pex_lib.spice"
+           f"{sub}\n.subckt RAMP_LR_PEX {' '.join(PORTS)}\n" + "\n".join(lines) + "\n.ends\n")
+    f = OUT / "pex_lib.spice"
     f.write_text(lib)
     print(f"post-layout library: {len(cells)} cells, {n_iq} output-PMOS fingers on VIQ, {len(floating)} floating nodes")
     return f

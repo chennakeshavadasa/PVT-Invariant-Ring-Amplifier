@@ -1,5 +1,0 @@
-circuit RAMP_V2 <-> RAMP_V2: Match
-  device pairs: 62, mismatched: 0
-  net pairs: 43, mismatched: 0
-layout devices by class: {'cap_cmim': 2, 'rhigh': 7, 'sg13_hv_nmos': 15, 'sg13_hv_pmos': 10, 'sg13_lv_nmos': 15, 'sg13_lv_pmos': 13}
-schematic devices by class: {'CAP_CMIM': 2, 'RHIGH': 7, 'sg13_hv_nmos': 15, 'sg13_hv_pmos': 10, 'sg13_lv_nmos': 15, 'sg13_lv_pmos': 13}
